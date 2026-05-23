@@ -1,0 +1,6 @@
+streamlit
+pandas
+streamlit-sheets-connection
+pyTelegramBotAPI
+gspread
+oauth2client
