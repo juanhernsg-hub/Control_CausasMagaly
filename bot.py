@@ -5,8 +5,8 @@ import json
 from datetime import datetime
 
 # 🔑 CONFIGURACIÓN PRINCIPAL
-TOKEN_TELEGRAM = "TU_TOKEN_DE_TELEGRAM_BOT_AQUI"
-WEBAPP_URL = "TU_URL_DE_APPS_SCRIPT_DE_GOOGLE_AQUI"
+TOKEN_TELEGRAM = "8867621977:AAFIOV7R4ou1nNcThJBCGgkayshTaV5rDoo"
+WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxvkfqb-2OoyoQgpHw2G6xNWoKDxokKXKRIPer-RCO2Or9tI3L9zj1jdnWMbeFyPZAg/exec"
 
 bot = telebot.TeleBot(TOKEN_TELEGRAM)
 
