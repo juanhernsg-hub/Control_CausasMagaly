@@ -6,7 +6,7 @@ from datetime import datetime
 
 # 🔑 CONFIGURACIÓN PRINCIPAL
 TOKEN_TELEGRAM = "8867621977:AAE_fjmpD9aTnpgjfC5RHNEDSRhUsCwG6Ww"
-WEBAPP_URL = "https://docs.google.com/spreadsheets/d/1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU/edit?usp=sharing"
+WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxvkfqb-2OoyoQgpHw2G6xNWoKDxokKXKRIPer-RCO2Or9tI3L9zj1jdnWMbeFyPZAg/exec"
 
 # 🌐 PARCHE OBLIGATORIO PARA CUENTAS GRATUITAS DE PYTHONANYWHERE
 from telebot import apihelper
