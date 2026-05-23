@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 
 # 🔑 CONFIGURACIÓN PRINCIPAL
-TOKEN_TELEGRAM = "8867621977:AAE_fjmpD9aTnpgjfC5RHNEDSRhUsCwG6WwI"  
+TOKEN_TELEGRAM = "8867621977:AAE_fjmpD9aTnpgjfC5RHNEDSRhUsCwG6Ww"  
 WEBAPP_URL = "https://docs.google.com/spreadsheets/d/1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU/edit?usp=sharing"
 
 bot = telebot.TeleBot(TOKEN_TELEGRAM)
