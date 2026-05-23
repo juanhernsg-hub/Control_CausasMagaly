@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import re
 
 # Configuración de la página del Escritorio Jurídico
 st.set_page_config(
@@ -9,41 +10,50 @@ st.set_page_config(
 )
 
 st.title("⚖️ Escritorio Jurídico - Control Digital de Causas")
-st.markdown("Plataforma interactiva vinculada a Google Sheets mediante exportación CSV directa.")
+st.markdown("Plataforma interactiva automatizada vinculada a Google Sheets mediante exportación directa.")
 
-# 🔑 REEMPLAZA ESTO: Pon aquí el ID largo de tu Google Sheets (el que va después de /d/)
-SHEET_ID = "1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU"
+# 🔗 REEMPLAZA EL ENLACE DE ABAJO: Pon el enlace de compartir de tu Google Sheets real
+URL_COMPARTIR = "https://docs.google.com/spreadsheets/d/1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU/edit?usp=sharing"
 
-# URLs de exportación directa para cada pestaña en formato CSV
-URL_ADMIN = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=administrativos"
-URL_TRIBUNAL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=tribunal_causas"
+def extraer_sheet_id(url):
+    match = re.search(r"/d/([a-zA-Z0-9-_]+)", url)
+    if match:
+        return match.group(1)
+    return None
 
-@st.cache_data(ttl=0)
-def cargar_datos(url):
-    try:
-        # Pandas lee el CSV de Google directamente a través de la red
-        return pd.read_csv(url)
-    except Exception as e:
-        st.error(f"Error al leer la pestaña: {e}")
-        return None
+SHEET_ID = extraer_sheet_id(URL_COMPARTIR)
 
-# Intentar la carga de datos
-df_admin = cargar_datos(URL_ADMIN)
-df_tribunal = cargar_datos(URL_TRIBUNAL)
+if not SHEET_ID or "TU_ENLACE_COMPLETO_AQUI" in URL_COMPARTIR:
+    st.warning("⚠️ Por favor, edita la línea 16 de tu código e introduce tu enlace de compartir de Google Sheets real.")
+else:
+    # 🛠️ URLs corregidas apuntando exactamente a los nombres reales de tus pestañas
+    URL_ADMIN = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=administrativos"
+    URL_TRIBUNAL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=tribunalicios"
 
-# Crear la interfaz de pestañas en Streamlit
-tab1, tab2 = st.tabs(["📁 Trámites Administrativos", "🏛️ Causas Tribunalicias"])
+    @st.cache_data(ttl=0)
+    def cargar_datos(url):
+        try:
+            return pd.read_csv(url)
+        except Exception as e:
+            return None
 
-with tab1:
-    st.subheader("Control de Casos Administrativos")
-    if df_admin is not None and not df_admin.empty:
-        st.dataframe(df_admin, use_container_width=True)
-    else:
-        st.info("No hay datos disponibles en la pestaña 'administrativos'.")
+    # Intento de lectura de datos
+    df_admin = cargar_datos(URL_ADMIN)
+    df_tribunal = cargar_datos(URL_TRIBUNAL)
 
-with tab2:
-    st.subheader("Control de Casos Tribunalicios")
-    if df_tribunal is not None and not df_tribunal.empty:
-        st.dataframe(df_tribunal, use_container_width=True)
-    else:
-        st.info("No hay datos disponibles en la pestaña 'tribunal_causas'.")
+    # Crear la interfaz visual de navegación
+    tab1, tab2 = st.tabs(["📁 Trámites Administrativos", "🏛️ Causas Tribunalicias"])
+
+    with tab1:
+        st.subheader("Control de Casos Administrativos")
+        if df_admin is not None:
+            st.dataframe(df_admin, use_container_width=True)
+        else:
+            st.error("No se pudo leer la pestaña 'administrativos'. Verifica que el archivo esté configurado como 'Cualquier persona con el enlace' en modo Lector.")
+
+    with tab2:
+        st.subheader("Control de Casos Tribunalicios")
+        if df_tribunal is not None:
+            st.dataframe(df_tribunal, use_container_width=True)
+        else:
+            st.error("No se pudo leer la pestaña 'tribunalicios'. Verifica que el nombre en Google Sheets coincida exactamente.")
