@@ -34,7 +34,7 @@ def extraer_sheet_id(url):
 
 SHEET_ID = extraer_sheet_id(URL_COMPARTIR)
 
-if not SHEET_ID or "TU_ENLACE_COMPLETO_AQUI" in URL_COMPARTIR:
+if not SHEET_ID or "https://docs.google.com/spreadsheets/d/1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU/edit?usp=sharing" in URL_COMPARTIR:
     st.warning("⚠️ Por favor, introduce tu enlace de compartir de Google Sheets real en la línea 24.")
 else:
     # Construcción de las URLs apuntando exactamente a tus pestañas reales
