@@ -1,92 +1,49 @@
-import telebot
-from telebot import types
-import requests
-import json
-from datetime import datetime
+import streamlit as st
+import pandas as pd
 
-# 🔑 CONFIGURACIÓN PRINCIPAL
-TOKEN_TELEGRAM = "TU_TOKEN_DE_TELEGRAM_BOT_AQUI"
-# Pega aquí la URL que te dio Google (la misma que abriste en el navegador)
-WEBAPP_URL = "TU_URL_DE_APPS_SCRIPT_DE_GOOGLE_AQUI"
+# Configuración de la página del Escritorio Jurídico
+st.set_page_config(
+    page_title="Escritorio Jurídico - Control de Causas",
+    page_icon="⚖️",
+    layout="wide"
+)
 
-bot = telebot.TeleBot(TOKEN_TELEGRAM)
+st.title("⚖️ Escritorio Jurídico - Control Digital de Causas")
+st.markdown("Plataforma interactiva vinculada a Google Sheets mediante exportación CSV directa.")
 
-# Diccionario temporal para guardar el estado del flujo por usuario
-user_data = {}
+# 🔑 REEMPLAZA ESTO: Pon aquí el ID largo de tu Google Sheets (el que va después de /d/)
+SHEET_ID = "TU_ID_DE_GOOGLE_SHEETS_AQUI"
 
-@bot.message_handler(commands=['start', 'menu'])
-def enviar_menu(message):
-    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    btn_admin = types.KeyboardButton('📁 Nuevo Trámite Administrativo')
-    btn_tribunal = types.KeyboardButton('🏛️ Nueva Causa Tribunalicia')
-    markup.add(btn_admin, btn_tribunal)
-    
-    bot.send_message(
-        message.chat.id, 
-        "⚖️ **Escritorio Jurídico - Asistente de Control**\nSelecciona el tipo de caso que deseas registrar:", 
-        parse_mode="Markdown", 
-        reply_markup=markup
-    )
+# URLs de exportación directa para cada pestaña en formato CSV
+URL_ADMIN = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=administrativos"
+URL_TRIBUNAL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=tribunal_causas"
 
-@bot.message_handler(func=lambda message: message.text in ['📁 Nuevo Trámite Administrativo', '🏛️ Nueva Causa Tribunalicia'])
-def iniciar_registro(message):
-    chat_id = message.chat.id
-    # Corregido para que use 'tribunal_causas' tal como se ve en tu Google Sheets
-    pestana = "administrativos" if "Administrativo" in message.text else "tribunal_causas"
-    
-    user_data[chat_id] = {
-        "pestana": pestana,
-        "fecha": datetime.now().strftime("%Y-%m-%d"),
-        "paso": 1
-    }
-    
-    markup = types.ReplyKeyboardRemove()
-    bot.send_message(chat_id, "✍️ Ingrese el **Nombre del Cliente**:", parse_mode="Markdown", reply_markup=markup)
+@st.cache_data(ttl=0)
+def cargar_datos(url):
+    try:
+        # Pandas lee el CSV de Google directamente a través de la red
+        return pd.read_csv(url)
+    except Exception as e:
+        st.error(f"Error al leer la pestaña: {e}")
+        return None
 
-@bot.message_handler(func=lambda message: message.chat.id in user_data)
-def procesar_flujo(message):
-    chat_id = message.chat.id
-    datos_usuario = user_data[chat_id]
-    
-    # PASO 1: Capturar Cliente y pedir detalle
-    if datos_usuario["paso"] == 1:
-        datos_usuario["cliente"] = message.text
-        datos_usuario["paso"] = 2
-        bot.send_message(chat_id, "📝 Ingrese el **Detalle o Tipo de Trámite/Causa**:", parse_mode="Markdown")
-        
-    # PASO 2: Capturar detalle y enviar a la nube
-    elif datos_usuario["paso"] == 2:
-        datos_usuario["detalle"] = message.text
-        
-        bot.send_message(chat_id, "⏳ Guardando registro en Google Sheets...")
-        
-        # Estructura alineada a tus columnas: id, fecha_registro, cliente, tipo_tramite
-        payload = {
-            "pestana": datos_usuario["pestana"],
-            "datos": [
-                "",                         # Columna A: id (vacío)
-                datos_usuario["fecha"],     # Columna B: fecha_registro
-                datos_usuario["cliente"],   # Columna C: cliente
-                datos_usuario["detalle"]    # Columna D: tipo_tramite
-            ]
-        }
-        
-        try:
-            # Enviamos los datos mediante POST (el método que procesa el Apps Script)
-            response = requests.post(WEBAPP_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
-            res_json = response.json()
-            
-            if res_json.get("status") == "success":
-                bot.send_message(chat_id, "✅ **¡Registro guardado con éxito!**\nYa está enviado a Google Sheets.", parse_mode="Markdown")
-            else:
-                bot.send_message(chat_id, f"❌ Error en el script de Google: {res_json.get('message')}")
-        except Exception as e:
-            bot.send_message(chat_id, f"❌ Fallo de comunicación: {e}")
-            
-        # Limpiar flujo
-        del user_data[chat_id]
-        enviar_menu(message)
+# Intentar la carga de datos
+df_admin = cargar_datos(URL_ADMIN)
+df_tribunal = cargar_datos(URL_TRIBUNAL)
 
-if __name__ == "__main__":
-    print("Bot activo y escuchando...")
-    bot.infinity_polling()
+# Crear la interfaz de pestañas en Streamlit
+tab1, tab2 = st.tabs(["📁 Trámites Administrativos", "🏛️ Causas Tribunalicias"])
+
+with tab1:
+    st.subheader("Control de Casos Administrativos")
+    if df_admin is not None and not df_admin.empty:
+        st.dataframe(df_admin, use_container_width=True)
+    else:
+        st.info("No hay datos disponibles en la pestaña 'administrativos'.")
+
+with tab2:
+    st.subheader("Control de Casos Tribunalicios")
+    if df_tribunal is not None and not df_tribunal.empty:
+        st.dataframe(df_tribunal, use_container_width=True)
+    else:
+        st.info("No hay datos disponibles en la pestaña 'tribunal_causas'.")
