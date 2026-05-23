@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import time
 
 # Configuración de la página del Escritorio Jurídico
 st.set_page_config(
@@ -11,14 +12,11 @@ st.set_page_config(
 st.title("⚖️ Escritorio Jurídico - Control Digital de Causas")
 st.markdown("Plataforma interactiva vinculada a Google Sheets mediante exportación CSV directa.")
 
-# 🔑 SOLUCIÓN: Solo el ID limpio extraído de tu enlace
+# ID limpio extraído de tu enlace
 SHEET_ID = "1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU"
 
-# URLs de exportación directa para cada pestaña en formato CSV
-URL_ADMIN = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=administrativos"
-URL_TRIBUNAL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=tribunal_causas"
-
-@st.cache_data(ttl=60) # 💡 Cambiado a 60 segundos para no saturar a Google con peticiones en cada clic, pero manteniendo datos frescos
+# Bajamos el tiempo de caché a 2 segundos para permitir la actualización rápida
+@st.cache_data(ttl=2)
 def cargar_datos(url):
     try:
         # Pandas lee el CSV de Google directamente a través de la red
@@ -27,23 +25,38 @@ def cargar_datos(url):
         st.error(f"Error al leer la pestaña: {e}")
         return None
 
-# Intentar la carga de datos
-df_admin = cargar_datos(URL_ADMIN)
-df_tribunal = cargar_datos(URL_TRIBUNAL)
+# --- CONTENEDOR DE AUTO-REFRESCO AUTOMÁTICO VIA FRAGMENTOS ---
+@st.fragment(run_every=3) # ⏳ ¡Aquí ocurre la magia! Recarga esta sección cada 3 segundos de manera invisible
+def mostrar_tablero():
+    # Creamos un timestamp dinámico para obligar a Google a saltarse su propio caché interno
+    timestamp = int(time.time())
+    
+    URL_ADMIN = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=administrativos&cb={timestamp}"
+    URL_TRIBUNAL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=tribunal_causas&cb={timestamp}"
 
-# Crear la interfaz de pestañas en Streamlit
-tab1, tab2 = st.tabs(["📁 Trámites Administrativos", "🏛️ Causas Tribunalicias"])
+    # Intentar la carga de datos frescos
+    df_admin = cargar_datos(URL_ADMIN)
+    df_tribunal = cargar_datos(URL_TRIBUNAL)
 
-with tab1:
-    st.subheader("Control de Casos Administrativos")
-    if df_admin is not None and not df_admin.empty:
-        st.dataframe(df_admin, use_container_width=True)
-    else:
-        st.info("No hay datos disponibles en la pestaña 'administrativos' o el documento no es público.")
+    # Mostrar indicador visual discreto del estado de actualización
+    st.caption(f"🔄 Última sincronización automática: Hace un instante")
 
-with tab2:
-    st.subheader("Control de Casos Tribunalicios")
-    if df_tribunal is not None and not df_tribunal.empty:
-        st.dataframe(df_tribunal, use_container_width=True)
-    else:
-        st.info("No hay datos disponibles en la pestaña 'tribunal_causas' o el documento no es público.")
+    # Crear la interfaz de pestañas en Streamlit
+    tab1, tab2 = st.tabs(["📁 Trámites Administrativos", "🏛️ Causas Tribunalicias"])
+
+    with tab1:
+        st.subheader("Control de Casos Administrativos")
+        if df_admin is not None and not df_admin.empty:
+            st.dataframe(df_admin, use_container_width=True)
+        else:
+            st.info("No hay datos disponibles en la pestaña 'administrativos' o el documento no es público.")
+
+    with tab2:
+        st.subheader("Control de Casos Tribunalicios")
+        if df_tribunal is not None and not df_tribunal.empty:
+            st.dataframe(df_tribunal, use_container_width=True)
+        else:
+            st.info("No hay datos disponibles en la pestaña 'tribunal_causas' o el documento no es público.")
+
+# Ejecutar el tablero dinámico
+mostrar_tablero()
