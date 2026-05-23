@@ -1,6 +1,2 @@
-streamlit
-pandas
-streamlit-sheets-connection
-pyTelegramBotAPI
-gspread
-oauth2client
+streamlit>=1.30.0
+pandas>=2.0.0
