@@ -1,40 +1,70 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 
-# Configuración de la página del Escritorio Jurídico
+# =========================
+# CONFIGURACIÓN DE PÁGINA
+# =========================
 st.set_page_config(
-    page_title="Escritorio Jurídico - Control de Causas",
+    page_title="Escritorio Jurídico - Control Digital de Causas",
     page_icon="⚖️",
     layout="wide"
 )
 
+# =========================
+# TÍTULO
+# =========================
 st.title("⚖️ Escritorio Jurídico - Control Digital de Causas")
-st.markdown("Plataforma interactiva automatizada vinculada a Google Sheets en tiempo real.")
+st.markdown(
+    "Plataforma interactiva automatizada vinculada a Google Sheets en tiempo real."
+)
 
-# Conexión directa con Google Sheets usando las credenciales de Secrets
+# =========================
+# CONEXIÓN GOOGLE SHEETS
+# =========================
 try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    
-    # Lectura de las dos pestañas de tu archivo Google Sheets
-    df_admin = conn.read(worksheet="administrativos", ttl=0)
-    df_tribunal = conn.read(worksheet="tribunal_causas", ttl=0)
-    
-    # Crear pestañas visuales atractivas en la interfaz web
-    tab1, tab2 = st.tabs(["📁 Trámites Administrativos", "🏛️ Causas Tribunalicias"])
-    
+
+    conn = st.connection(
+        "gsheets",
+        type=GSheetsConnection
+    )
+
+    # Leer hojas
+    df_admin = conn.read(
+        worksheet="administrativos",
+        ttl=0
+    )
+
+    df_tribunal = conn.read(
+        worksheet="tribunal_causas",
+        ttl=0
+    )
+
+    # Crear tabs
+    tab1, tab2 = st.tabs([
+        "📁 Trámites Administrativos",
+        "🏛️ Causas Tribunalicias"
+    ])
+
+    # TAB ADMINISTRATIVOS
     with tab1:
+
         st.subheader("Control de Casos Administrativos")
-        if df_admin is not None and not df_admin.empty:
+
+        if not df_admin.empty:
             st.dataframe(df_admin, use_container_width=True)
         else:
-            st.info("No hay registros en la pestaña de administrativos o la tabla está vacía.")
-            
+            st.info("No hay registros en administrativos.")
+
+    # TAB TRIBUNALES
     with tab2:
+
         st.subheader("Control de Casos Tribunalicios")
-        if df_tribunal is not None and not df_tribunal.empty:
+
+        if not df_tribunal.empty:
             st.dataframe(df_tribunal, use_container_width=True)
         else:
-            st.info("No hay registros en la pestaña de tribunal_causas o la tabla está vacía.")
+            st.info("No hay registros en tribunal_causas.")
 
 except Exception as e:
-    st.error(f"Error al conectar con Google Sheets. Verifica las pestañas: {e}")
+
+    st.error(f"Error al conectar con Google Sheets: {e}")
