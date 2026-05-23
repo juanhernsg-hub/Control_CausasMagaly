@@ -33,7 +33,7 @@ function doPost(e) {
     var saludo = "⚖️ *Asistente Virtual de Control de Causas*\n\n" +
                  "¿Qué tipo de caso deseas registrar hoy?\n\n" +
                  "👉 Escribe *1* para Trámite Administrativo\n" +
-                 "👉 Escribe *2* para Causa Tribunalicia\n\n" +
+                 "👉 Escribe *2* para tribunal_causas n\n" +
                  "_(Puedes cancelar el proceso en cualquier momento escribiendo /cancelar)_";
     sendText(chatId, saludo);
     return;
@@ -46,7 +46,7 @@ function doPost(e) {
       sendText(chatId, "👤 *Trámite Administrativo*\n\n¿Cuál es el nombre del **Cliente**?");
     } else if (text === "2") {
       actualizarEstado(sheetEstados, filaUsuario, chatId, "TRIBUNAL_EXPEDIENTE", "tribunal_causas");
-      sendText(chatId, "🏛️ *Causa Tribunalicia*\n\n¿Cuál es el número de **Expediente**?");
+      sendText(chatId, "🏛️ *tribunal_causas*\n\n¿Cuál es el número de **Expediente**?");
     } else {
       sendText(chatId, "⚠️ Opción no válida. Por favor, escribe *1* o *2*, o /start para reiniciar.");
     }
@@ -81,14 +81,14 @@ function doPost(e) {
     actualizarEstado(sheetEstados, filaUsuario, chatId, "TRIBUNAL_ESTADO", datosGuardados + "||" + text);
     sendText(chatId, "⏳ ¿Cuál es el **Estado** actual del expediente? (Ej: Fase de Alegatos, Sentencia)");
   } 
-  else if (estadoActual === "TRIBUNAL_ESTADO") {
+  else if (estadoActual === "tribunal_causas") {
     var partes = datosGuardados.split("||");
     var tabla = ss.getSheetByName(partes[0]); // tribunal_causas
     
     // Insertar en la tabla: Fecha, Expediente, Tribunal, Estado
     tabla.appendRow([new Date(), partes[1], partes[2], text]);
     
-    sendText(chatId, "🏛️ *¡Causa Tribunalicia registrada!*\nEl expediente se ha actualizado correctamente.");
+    sendText(chatId, "🏛️ *¡tribunal_causas registrada!*\nEl expediente se ha actualizado correctamente.");
     limpiarEstado(sheetEstados, filaUsuario, chatId);
   }
 }
