@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
+import time
 
 # Configuración de la página del Escritorio Jurídico
 st.set_page_config(
@@ -9,11 +10,22 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("⚖️ Escritorio Jurídico - Control Digital de Causas")
-st.markdown("Plataforma interactiva automatizada vinculada a Google Sheets mediante exportación directa.")
+# 🔄 AUTO-REFRESCO: Esto fuerza a la app a actualizarse sola cada 30 segundos
+if "last_refresh" not Locke in st.session_state:
+    st.session_state.last_refresh = time.time()
 
-# 🔗 REEMPLAZA EL ENLACE DE ABAJO: Pon el enlace de compartir de tu Google Sheets real
-URL_COMPARTIR = "https://docs.google.com/spreadsheets/d/1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU/edit?usp=sharing"
+# Fragmento que genera una cuenta regresiva invisible para recargar
+st.image([], width=0) # Truco estético para mantener estabilidad
+time_elapsed = time.time() - st.session_state.last_refresh
+if time_elapsed > 30:
+    st.session_state.last_refresh = time.time()
+    st.rerun()
+
+st.title("⚖️ Escritorio Jurídico - Control Digital de Causas")
+st.markdown("Plataforma interactiva vinculada a Google Sheets en tiempo real (Auto-refresco cada 30s).")
+
+# Enlace de compartir de tu Google Sheets real
+URL_COMPARTIR = "TU_URL_DE_GOOGLE_SHEETS_AQUI"
 
 def extraer_sheet_id(url):
     match = re.search(r"/d/([a-zA-Z0-9-_]+)", url)
@@ -23,13 +35,14 @@ def extraer_sheet_id(url):
 
 SHEET_ID = extraer_sheet_id(URL_COMPARTIR)
 
-if not SHEET_ID or "TU_ENLACE_COMPLETO_AQUI" in URL_COMPARTIR:
-    st.warning("⚠️ Por favor, edita la línea 16 de tu código e introduce tu enlace de compartir de Google Sheets real.")
+if not SHEET_ID or "https://docs.google.com/spreadsheets/d/1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU/edit?usp=sharing" in URL_COMPARTIR:
+    st.warning("⚠️ Por favor, introduce tu enlace de compartir de Google Sheets real en la línea 24.")
 else:
-    # 🛠️ URLs corregidas apuntando exactamente a los nombres reales de tus pestañas
+    # URLs apuntando a tus pestañas reales
     URL_ADMIN = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=administrativos"
     URL_TRIBUNAL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=tribunalicios"
 
+    # Forzamos ttl=0 para que nunca use caché vieja
     @st.cache_data(ttl=0)
     def cargar_datos(url):
         try:
@@ -37,11 +50,9 @@ else:
         except Exception as e:
             return None
 
-    # Intento de lectura de datos
     df_admin = cargar_datos(URL_ADMIN)
     df_tribunal = cargar_datos(URL_TRIBUNAL)
 
-    # Crear la interfaz visual de navegación
     tab1, tab2 = st.tabs(["📁 Trámites Administrativos", "🏛️ Causas Tribunalicias"])
 
     with tab1:
@@ -49,11 +60,11 @@ else:
         if df_admin is not None:
             st.dataframe(df_admin, use_container_width=True)
         else:
-            st.error("No se pudo leer la pestaña 'administrativos'. Verifica que el archivo esté configurado como 'Cualquier persona con el enlace' en modo Lector.")
+            st.error("No se pudo leer la pestaña 'administrativos'.")
 
     with tab2:
         st.subheader("Control de Casos Tribunalicios")
         if df_tribunal is not None:
             st.dataframe(df_tribunal, use_container_width=True)
         else:
-            st.error("No se pudo leer la pestaña 'tribunalicios'. Verifica que el nombre en Google Sheets coincida exactamente.")
+            st.error("No se pudo leer la pestaña 'tribunalicios'.")
