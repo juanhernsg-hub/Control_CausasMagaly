@@ -15,7 +15,7 @@ apihelper.proxy = {'http': 'http://proxy.server:3128', 'https': 'http://proxy.se
 
 bot = telebot.TeleBot(TOKEN_TELEGRAM)
 
-"fecha": datetime.now(zoneinfo.ZoneInfo("America/Caracas")).strftime("%Y-%m-%d %H:%M:%S"),
+fech = datetime.now(zoneinfo.ZoneInfo("America/Caracas")).strftime("%d-%m-%Y %H:%M:%S"),
 
 # 🛡️ LISTA DE USUARIOS AUTORIZADOS (Pon aquí los IDs de Telegram permitidos separados por comas)
 USUARIOS_PERMITIDOS = [8375789261, 5615273235]  # 👈 REEMPLAZA ESTOS NÚMEROS POR TU ID REAL Y EL DE TU EQUIPO
