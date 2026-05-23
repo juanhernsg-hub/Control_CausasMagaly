@@ -1,146 +1,94 @@
 import telebot
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-import sqlite3
+from telebot import types
+import requests
+import json
+from datetime import datetime
 
-TOKEN = "8867621977:AAFIOV7R4ou1nNcThJBCGgkayshTaV5rDoo" # <-- Tu Token de Telegram
-bot = telebot.TeleBot(TOKEN)
-DB_NAME = "C:/Users/Usuario/Documents/DASBOARD_MAGALY/datos.db"
+# 🔑 CONFIGURACIÓN PRINCIPAL
+TOKEN_TELEGRAM = "TU_TOKEN_DE_TELEGRAM_BOT_AQUI"
+WEBAPP_URL = "TU_URL_DE_APPS_SCRIPT_DE_GOOGLE_AQUI"
 
-datos_usuario = {}
+bot = telebot.TeleBot(TOKEN_TELEGRAM)
 
-def conectar_db():
-    return sqlite3.connect(DB_NAME)
+# Diccionario temporal para guardar el estado del flujo por usuario
+user_data = {}
 
-def mostrar_menu_auxiliar(message):
-    markup = ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    btn_admin = KeyboardButton("🏢 Nuevo Trámite Administrativo")
-    btn_tribunal = KeyboardButton("🏛️ Nuevo Trámite Tribunalicio")
+@bot.message_handler(commands=['start', 'menu'])
+def enviar_menu(message):
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    btn_admin = types.KeyboardButton('📁 Nuevo Trámite Administrativo')
+    btn_tribunal = types.KeyboardButton('🏛️ Nueva Causa Tribunalicia')
     markup.add(btn_admin, btn_tribunal)
     
-    uid = message.chat.id
     bot.send_message(
-        uid, 
-        "⚖️ **Asistente Jurídico Virtual**\nSelecciona el módulo correspondiente para iniciar el registro dirigido, o escribe /cancelar para salir:", 
-        reply_markup=markup,
-        parse_mode="Markdown"
+        message.chat.id, 
+        "⚖️ **Escritorio Jurídico - Asistente de Control**\nSelecciona el tipo de caso que deseas registrar:", 
+        parse_mode="Markdown", 
+        reply_markup=markup
     )
 
-@bot.message_handler(commands=['start', 'help', 'menu'])
-def menu_principal(message):
-    mostrar_menu_auxiliar(message)
-
-# --- FLUJO: REGISTRO ADMINISTRATIVO ---
-@bot.message_handler(func=lambda msg: msg.text == "🏢 Nuevo Trámite Administrativo")
-def iniciar_admin(message):
-    uid = message.chat.id
-    datos_usuario[uid] = {'tipo': 'admin', 'paso': 1}
-    bot.send_message(uid, "🏢 **Nuevo Trámite Administrativo**\n\n✍️ Escribe el Nombre del **Cliente**:", parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
-
-# --- FLUJO: REGISTRO TRIBUNALICIO ---
-@bot.message_handler(func=lambda msg: msg.text == "🏛️ Nuevo Trámite Tribunalicio")
-def iniciar_tribunal(message):
-    uid = message.chat.id
-    datos_usuario[uid] = {'tipo': 'tribunal', 'paso': 1}
-    bot.send_message(uid, "🏛️ **Nueva Causa Tribunalicia**\n\n✍️ Escribe el **Circuito Judicial** (Ej: CIVIL, LABORAL, NNA, CONTENCIOSO):", parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
-
-# --- PROCESADOR CENTRAL DE RESPUESTAS (MÁQUINA DE ESTADOS) ---
-@bot.message_handler(func=lambda msg: msg.chat.id in datos_usuario)
-def procesar_pasos(message):
-    uid = message.chat.id
-    usuario = datos_usuario[uid]
-    texto = message.text.strip()
+@bot.message_handler(func=lambda message: message.text in ['📁 Nuevo Trámite Administrativo', '🏛️ Nueva Causa Tribunalicia'])
+def iniciar_registro(message):
+    chat_id = message.chat.id
+    pestana = "administrativos" if "Administrativo" in message.text else "tribunalicios"
     
-    if texto.lower() == '/cancelar':
-        del datos_usuario[uid]
-        bot.send_message(uid, "❌ Operación cancelada por el usuario.", reply_markup=ReplyKeyboardRemove())
-        mostrar_menu_auxiliar(message)
-        return
+    user_data[chat_id] = {
+        "pestana": pestana,
+        "fecha": datetime.now().strftime("%Y-%m-%d"),
+        "paso": 1
+    }
+    
+    # Quitar teclados anteriores para escribir libre
+    markup = types.ReplyKeyboardRemove()
+    bot.send_message(chat_id, "✍️ Ingrese el **Nombre del Cliente**:", parse_mode="Markdown", reply_markup=markup)
 
-    # --- LÓGICA DE CAPTURA ADMINISTRATIVA ---
-    if usuario['tipo'] == 'admin':
-        if usuario['paso'] == 1:
-            usuario['cliente'] = texto
-            usuario['paso'] = 2
-            bot.send_message(uid, "✍️ Escribe el **Tipo de Trámite** (Ej: Título Supletorio, Solicitud ante Sarem, Reenganche):")
-        elif usuario['paso'] == 2:
-            usuario['tipo_tramite'] = texto
-            usuario['paso'] = 3
-            bot.send_message(uid, "✍️ Detalla los **Recaudos Recibidos** (Ej: Copias de cédula, Título anterior, Documento de propiedad):")
-        elif usuario['paso'] == 3:
-            usuario['recaudos'] = texto
-            usuario['paso'] = 4
-            bot.send_message(uid, "✍️ Detalla los **Trámites Realizados / Actuaciones** hasta la fecha:")
-        elif usuario['paso'] == 4:
-            usuario['tramites'] = texto
-            usuario['paso'] = 5
-            markup = ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-            markup.add("Activo", "Pendiente", "Terminado", "Cerrado")
-            bot.send_message(uid, "📍 Selecciona el **Estado actual** del caso administrativo:", reply_markup=markup)
-        elif usuario['paso'] == 5:
-            usuario['estatus'] = texto
+@bot.message_handler(func=lambda message: message.chat.id in user_data)
+def procesar_flujo(message):
+    chat_id = message.chat.id
+    datos_usuario = user_data[chat_id]
+    
+    # PASO 1: Capturar Cliente y pedir tipo de trámite o delito/causa
+    if datos_usuario["paso"] == 1:
+        datos_usuario["cliente"] = message.text
+        datos_usuario["paso"] = 2
+        bot.send_message(chat_id, "📝 Ingrese el **Detalle o Tipo de Trámite/Causa**:", parse_mode="Markdown")
+        
+    # PASO 2: Capturar detalle y enviar directamente a Google Sheets
+    elif datos_usuario["paso"] == 2:
+        datos_usuario["detalle"] = message.text
+        
+        bot.send_message(chat_id, "⏳ Guardando registro en Google Sheets...")
+        
+        # Estructuramos los datos en el orden exacto de tus columnas del Sheets
+        # Fila: [ID/Auto, Fecha, Cliente, Detalle/Tipo]
+        # Nota: Dejamos el ID en blanco para que lo llenes en Sheets, o puedes usar el chat_id
+        payload = {
+            "pestana": datos_usuario["pestana"],
+            "datos": [
+                "", # Columna A: id (puedes dejarlo vacío o generar un correlativo)
+                datos_usuario["fecha"], # Columna B: fecha_registro
+                datos_usuario["cliente"], # Columna C: cliente
+                datos_usuario["detalle"]   # Columna D: tipo_tramite
+            ]
+        }
+        
+        try:
+            # Enviamos los datos al conector de Google
+            response = requests.post(WEBAPP_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
+            res_json = response.json()
             
-            # Guardado final estructurado
-            conn = conectar_db()
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO administrativos (cliente, tipo_tramite, recaudos_recibidos, tramites_realizados, estatus, registrado_por)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (usuario['cliente'], usuario['tipo_tramite'], usuario['recaudos'], usuario['tramites'], usuario['estatus'], message.from_user.first_name))
-            conn.commit()
-            conn.close()
+            if res_json.get("status") == "success":
+                bot.send_message(chat_id, "✅ **¡Registro guardado con éxito!**\nYa está visible en el Escritorio Jurídico web.", parse_mode="Markdown")
+            else:
+                bot.send_message(chat_id, f"❌ Error al guardar en Sheets: {res_json.get('message')}")
+        except Exception as e:
+            bot.send_message(chat_id, f"❌ Fallo de conexión con la nube: {e}")
             
-            bot.send_message(uid, "✅ **¡Caso Administrativo registrado exitosamente e indexado al Excel!**")
-            del datos_usuario[uid]
-            mostrar_menu_auxiliar(message)
+        # Limpiar el estado de este usuario
+        del user_data[chat_id]
+        enviar_menu(message)
 
-    # --- LÓGICA DE CAPTURA TRIBUNALICIA ---
-    elif usuario['tipo'] == 'tribunal':
-        if usuario['paso'] == 1:
-            usuario['circuito'] = texto
-            usuario['paso'] = 2
-            bot.send_message(uid, "✍️ Escribe el **Número de Expediente / Causa**:")
-        elif usuario['paso'] == 2:
-            usuario['expediente'] = texto
-            usuario['paso'] = 3
-            bot.send_message(uid, "✍️ Escribe el **Tribunal** a cargo de la causa:")
-        elif usuario['paso'] == 3:
-            usuario['tribunal'] = texto
-            usuario['paso'] = 4
-            bot.send_message(uid, "✍️ Escribe las **Partes involucradas** (Ej: Demandante vs Demandado):")
-        elif usuario['paso'] == 4:
-            usuario['partes'] = texto
-            usuario['paso'] = 5
-            bot.send_message(uid, "✍️ Escribe el **Recurso / Objeto del Juicio** (Ej: Divorcio, Unión Estable, Tercería):")
-        elif usuario['paso'] == 5:
-            usuario['recurso'] = texto
-            usuario['paso'] = 6
-            bot.send_message(uid, "✍️ Detalla las últimas **Actuaciones** procesales:")
-        elif usuario['paso'] == 6:
-            usuario['actuaciones'] = texto
-            usuario['paso'] = 7
-            bot.send_message(uid, "✍️ Agrega las **Observaciones** generales de control:")
-        elif usuario['paso'] == 7:
-            usuario['observaciones'] = texto
-            usuario['paso'] = 8
-            markup = ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-            markup.add("Activo", "Sentenciado", "Pendiente", "En Espera", "Terminado")
-            bot.send_message(uid, "📍 Selecciona el **Estado procesal** de la causa:", reply_markup=markup)
-        elif usuario['paso'] == 8:
-            usuario['estatus'] = texto
-            
-            # Guardado completo indexado
-            conn = conectar_db()
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO tribunalicios (circuito, numero_expediente, tribunal, partes, recurso, actuaciones, observaciones, estatus, registrado_por)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (usuario['circuito'], usuario['expediente'], usuario['tribunal'], usuario['partes'], usuario['recurso'], usuario['actuaciones'], usuario['observaciones'], usuario['estatus'], message.from_user.first_name))
-            conn.commit()
-            conn.close()
-            
-            bot.send_message(uid, "✅ **¡Expediente Judicial sincronizado con éxito e indexado al Excel!**")
-            del datos_usuario[uid]
-            mostrar_menu_auxiliar(message)
-
-print("🤖 Bot UX Adaptativo corriendo de forma limpia...")
-bot.infinity_polling()
+# Iniciar el bot en modo escucha local
+if __name__ == "__main__":
+    print("Bot corriendo...")
+    bot.infinity_polling()
