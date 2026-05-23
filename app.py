@@ -11,14 +11,14 @@ st.set_page_config(
 st.title("⚖️ Escritorio Jurídico - Control Digital de Causas")
 st.markdown("Plataforma interactiva vinculada a Google Sheets mediante exportación CSV directa.")
 
-# 🔑 REEMPLAZA ESTO: Pon aquí el ID largo de tu Google Sheets (el que va después de /d/)
-SHEET_ID = "https://docs.google.com/spreadsheets/d/1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU/edit?usp=sharing"
+# 🔑 SOLUCIÓN: Solo el ID limpio extraído de tu enlace
+SHEET_ID = "1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU"
 
 # URLs de exportación directa para cada pestaña en formato CSV
 URL_ADMIN = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=administrativos"
 URL_TRIBUNAL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=tribunal_causas"
 
-@st.cache_data(ttl=0)
+@st.cache_data(ttl=60) # 💡 Cambiado a 60 segundos para no saturar a Google con peticiones en cada clic, pero manteniendo datos frescos
 def cargar_datos(url):
     try:
         # Pandas lee el CSV de Google directamente a través de la red
@@ -39,11 +39,11 @@ with tab1:
     if df_admin is not None and not df_admin.empty:
         st.dataframe(df_admin, use_container_width=True)
     else:
-        st.info("No hay datos disponibles en la pestaña 'administrativos'.")
+        st.info("No hay datos disponibles en la pestaña 'administrativos' o el documento no es público.")
 
 with tab2:
     st.subheader("Control de Casos Tribunalicios")
     if df_tribunal is not None and not df_tribunal.empty:
         st.dataframe(df_tribunal, use_container_width=True)
     else:
-        st.info("No hay datos disponibles en la pestaña 'tribunal_causas'.")
+        st.info("No hay datos disponibles en la pestaña 'tribunal_causas' o el documento no es público.")
