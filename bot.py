@@ -1,94 +1,123 @@
-import telebot
-from telebot import types
-import requests
-import json
-from datetime import datetime
+var TOKEN = "8867621977:AAFIOV7R4ou1nNcThJBCGgkayshTaV5rDoo";
+var MI_CHAT_ID = "8375789261";
 
-# 🔑 CONFIGURACIÓN PRINCIPAL
-TOKEN_TELEGRAM = "T8867621977:AAFIOV7R4ou1nNcThJBCGgkayshTaV5rDoo"
-WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxvkfqb-2OoyoQgpHw2G6xNWoKDxokKXKRIPer-RCO2Or9tI3L9zj1jdnWMbeFyPZAg/exec"
-
-bot = telebot.TeleBot(TOKEN_TELEGRAM)
-
-# Diccionario temporal para guardar el estado del flujo por usuario
-user_data = {}
-
-@bot.message_handler(commands=['start', 'menu'])
-def enviar_menu(message):
-    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    btn_admin = types.KeyboardButton('📁 Nuevo Trámite Administrativo')
-    btn_tribunal = types.KeyboardButton('🏛️ Nueva Causa Tribunalicia')
-    markup.add(btn_admin, btn_tribunal)
-    
-    bot.send_message(
-        message.chat.id, 
-        "⚖️ **Escritorio Jurídico - Asistente de Control**\nSelecciona el tipo de caso que deseas registrar:", 
-        parse_mode="Markdown", 
-        reply_markup=markup
-    )
-
-@bot.message_handler(func=lambda message: message.text in ['📁 Nuevo Trámite Administrativo', '🏛️ Nueva Causa Tribunalicia'])
-def iniciar_registro(message):
-    chat_id = message.chat.id
-    pestana = "administrativos" if "Administrativo" in message.text else "tribunalicios"
-    
-    user_data[chat_id] = {
-        "pestana": pestana,
-        "fecha": datetime.now().strftime("%Y-%m-%d"),
-        "paso": 1
+function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var chatId = data.message.chat.id;
+  var text = data.message.text.trim();
+  
+  // Seguridad: Solo tú o tu equipo autorizado
+  if (chatId.toString() !== MI_CHAT_ID.toString()) return;
+  
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetEstados = ss.getSheetByName("estados_bot");
+  
+  // Buscar si este usuario ya inició un flujo de preguntas
+  var rangoEstados = sheetEstados.getDataRange().getValues();
+  var filaUsuario = -1;
+  var estadoActual = "";
+  var datosGuardados = "";
+  
+  for (var i = 1; i < rangoEstados.length; i++) {
+    if (rangoEstados[i][0].toString() === chatId.toString()) {
+      filaUsuario = i + 1;
+      estadoActual = rangoEstados[i][1];
+      datosGuardados = rangoEstados[i][2];
+      break;
     }
+  }
+  
+  // --- MENÚ PRINCIPAL O REINICIO ---
+  if (text === "/start" || text === "/cancelar") {
+    limpiarEstado(sheetEstados, filaUsuario, chatId);
+    var saludo = "⚖️ *Asistente Virtual de Control de Causas*\n\n" +
+                 "¿Qué tipo de caso deseas registrar hoy?\n\n" +
+                 "👉 Escribe *1* para Trámite Administrativo\n" +
+                 "👉 Escribe *2* para Causa Tribunalicia\n\n" +
+                 "_(Puedes cancelar el proceso en cualquier momento escribiendo /cancelar)_";
+    sendText(chatId, saludo);
+    return;
+  }
+  
+  // --- MÁQUINA DE ESTADOS (Conversación) ---
+  if (estadoActual === "") {
+    if (text === "1") {
+      actualizarEstado(sheetEstados, filaUsuario, chatId, "ADMIN_CLIENTE", "administrativos");
+      sendText(chatId, "👤 *Trámite Administrativo*\n\n¿Cuál es el nombre del **Cliente**?");
+    } else if (text === "2") {
+      actualizarEstado(sheetEstados, filaUsuario, chatId, "TRIBUNAL_EXPEDIENTE", "tribunal_causas");
+      sendText(chatId, "🏛️ *Causa Tribunalicia*\n\n¿Cuál es el número de **Expediente**?");
+    } else {
+      sendText(chatId, "⚠️ Opción no válida. Por favor, escribe *1* o *2*, o /start para reiniciar.");
+    }
+  } 
+  
+  // --- FLUJO ADMINISTRATIVOS ---
+  else if (estadoActual === "ADMIN_CLIENTE") {
+    actualizarEstado(sheetEstados, filaUsuario, chatId, "ADMIN_ASUNTO", datosGuardados + "||" + text);
+    sendText(chatId, "📝 ¿Cuál es el **Asunto o Trámite**? (Ej: Redacción de Contrato)");
+  } 
+  else if (estadoActual === "ADMIN_ASUNTO") {
+    actualizarEstado(sheetEstados, filaUsuario, chatId, "ADMIN_ESTADO", datosGuardados + "||" + text);
+    sendText(chatId, "⏳ ¿Cuál es el **Estado** actual? (Ej: En Revisión, Completado)");
+  } 
+  else if (estadoActual === "ADMIN_ESTADO") {
+    var partes = datosGuardados.split("||");
+    var tabla = ss.getSheetByName(partes[0]); // administrativos
     
-    # Quitar teclados anteriores para escribir libre
-    markup = types.ReplyKeyboardRemove()
-    bot.send_message(chat_id, "✍️ Ingrese el **Nombre del Cliente**:", parse_mode="Markdown", reply_markup=markup)
-
-@bot.message_handler(func=lambda message: message.chat.id in user_data)
-def procesar_flujo(message):
-    chat_id = message.chat.id
-    datos_usuario = user_data[chat_id]
+    // Insertar en la tabla: Fecha, Cliente, Asunto, Estado
+    tabla.appendRow([new Date(), partes[1], partes[2], text]);
     
-    # PASO 1: Capturar Cliente y pedir tipo de trámite o delito/causa
-    if datos_usuario["paso"] == 1:
-        datos_usuario["cliente"] = message.text
-        datos_usuario["paso"] = 2
-        bot.send_message(chat_id, "📝 Ingrese el **Detalle o Tipo de Trámite/Causa**:", parse_mode="Markdown")
-        
-    # PASO 2: Capturar detalle y enviar directamente a Google Sheets
-    elif datos_usuario["paso"] == 2:
-        datos_usuario["detalle"] = message.text
-        
-        bot.send_message(chat_id, "⏳ Guardando registro en Google Sheets...")
-        
-        # Estructuramos los datos en el orden exacto de tus columnas del Sheets
-        # Fila: [ID/Auto, Fecha, Cliente, Detalle/Tipo]
-        # Nota: Dejamos el ID en blanco para que lo llenes en Sheets, o puedes usar el chat_id
-        payload = {
-            "pestana": datos_usuario["pestana"],
-            "datos": [
-                "", # Columna A: id (puedes dejarlo vacío o generar un correlativo)
-                datos_usuario["fecha"], # Columna B: fecha_registro
-                datos_usuario["cliente"], # Columna C: cliente
-                datos_usuario["detalle"]   # Columna D: tipo_tramite
-            ]
-        }
-        
-        try:
-            # Enviamos los datos al conector de Google
-            response = requests.post(WEBAPP_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
-            res_json = response.json()
-            
-            if res_json.get("status") == "success":
-                bot.send_message(chat_id, "✅ **¡Registro guardado con éxito!**\nYa está visible en el Escritorio Jurídico web.", parse_mode="Markdown")
-            else:
-                bot.send_message(chat_id, f"❌ Error al guardar en Sheets: {res_json.get('message')}")
-        except Exception as e:
-            bot.send_message(chat_id, f"❌ Fallo de conexión con la nube: {e}")
-            
-        # Limpiar el estado de este usuario
-        del user_data[chat_id]
-        enviar_menu(message)
+    sendText(chatId, "✅ *¡Guardado con éxito!*\nEl trámite administrativo ya está reflejado en tu sistema y en la Web App.");
+    limpiarEstado(sheetEstados, filaUsuario, chatId);
+  }
+  
+  // --- FLUJO TRIBUNALES ---
+  else if (estadoActual === "TRIBUNAL_EXPEDIENTE") {
+    actualizarEstado(sheetEstados, filaUsuario, chatId, "TRIBUNAL_JUZGADO", datosGuardados + "||" + text);
+    sendText(chatId, "🏢 ¿En qué **Tribunal o Juzgado** se encuentra la causa?");
+  } 
+  else if (estadoActual === "TRIBUNAL_JUZGADO") {
+    actualizarEstado(sheetEstados, filaUsuario, chatId, "TRIBUNAL_ESTADO", datosGuardados + "||" + text);
+    sendText(chatId, "⏳ ¿Cuál es el **Estado** actual del expediente? (Ej: Fase de Alegatos, Sentencia)");
+  } 
+  else if (estadoActual === "TRIBUNAL_ESTADO") {
+    var partes = datosGuardados.split("||");
+    var tabla = ss.getSheetByName(partes[0]); // tribunal_causas
+    
+    // Insertar en la tabla: Fecha, Expediente, Tribunal, Estado
+    tabla.appendRow([new Date(), partes[1], partes[2], text]);
+    
+    sendText(chatId, "🏛️ *¡Causa Tribunalicia registrada!*\nEl expediente se ha actualizado correctamente.");
+    limpiarEstado(sheetEstados, filaUsuario, chatId);
+  }
+}
 
-# Iniciar el bot en modo escucha local
-if __name__ == "__main__":
-    print("Bot corriendo...")
-    bot.infinity_polling()
+// --- FUNCIONES DE APOYO PARA LA MEMORIA DEL BOT ---
+function actualizarEstado(sheet, fila, chatId, nuevoEstado, datos) {
+  if (fila === -1) {
+    sheet.appendRow([chatId, nuevoEstado, datos]);
+  } else {
+    sheet.getRange(fila, 2).setValue(nuevoEstado);
+    sheet.getRange(fila, 3).setValue(datos);
+  }
+}
+
+function limpiarEstado(sheet, fila, chatId) {
+  if (fila !== -1) {
+    sheet.deleteRow(fila);
+  }
+}
+
+function sendText(chatId, text) {
+  var url = "https://api.telegram.org/bot" + TOKEN + "/sendMessage";
+  var payload = {
+    "method": "post",
+    "payload": {
+      "chat_id": chatId,
+      "text": text,
+      "parse_mode": "Markdown"
+    }
+  };
+  UrlFetchApp.fetch(url, payload);
+}
