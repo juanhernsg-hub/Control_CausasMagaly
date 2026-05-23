@@ -12,7 +12,7 @@ st.title("⚖️ Escritorio Jurídico - Control Digital de Causas")
 st.markdown("Plataforma interactiva vinculada a Google Sheets mediante exportación CSV directa.")
 
 # 🔑 REEMPLAZA ESTO: Pon aquí el ID largo de tu Google Sheets (el que va después de /d/)
-SHEET_ID = "TU_ID_DE_GOOGLE_SHEETS_AQUI"
+SHEET_ID = "1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU1-CGHw4jFXPraBcNMPOL9n4EHnCu3jl0U2aib3lfMkhU"
 
 # URLs de exportación directa para cada pestaña en formato CSV
 URL_ADMIN = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=administrativos"
