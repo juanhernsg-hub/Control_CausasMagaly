@@ -17,8 +17,8 @@ user_data = {}
 def enviar_menu(message):
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     btn_admin = types.KeyboardButton('📁 Nuevo Trámite Administrativo')
-    btn_tribunal_causas = types.KeyboardButton('🏛️ Nueva tribunal_causas')
-    markup.add(btn_admin, btn_tribunal_causas)
+    btn_tribunal = types.KeyboardButton('🏛️ Nueva Causa Tribunalicia')
+    markup.add(btn_admin, btn_tribunal)
     
     bot.send_message(
         message.chat.id, 
@@ -27,10 +27,15 @@ def enviar_menu(message):
         reply_markup=markup
     )
 
-@bot.message_handler(func=lambda message: message.text in ['📁 Nuevo Trámite Administrativo', '🏛️ Nueva tribunal_causas'])
+@bot.message_handler(func=lambda message: message.text in ['📁 Nuevo Trámite Administrativo', '🏛️ Nueva Causa Tribunalicia'])
 def iniciar_registro(message):
     chat_id = message.chat.id
-    pestana = "administrativos" if "Administrativo" in message.text else "tribunal_causas"
+    
+    # SOLUCIÓN: Identificar explícitamente el botón presionado
+    if message.text == '📁 Nuevo Trámite Administrativo':
+        pestana = "administrativos"
+    else:
+        pestana = "tribunal_causas"
     
     user_data[chat_id] = {
         "pestana": pestana,
@@ -47,7 +52,7 @@ def procesar_flujo(message):
     chat_id = message.chat.id
     datos_usuario = user_data[chat_id]
     
-    # PASO 1: Capturar Cliente y pedir tipo de trámite o delito/causa
+    # PASO 1: Capturar Cliente y pedir detalle
     if datos_usuario["paso"] == 1:
         datos_usuario["cliente"] = message.text
         datos_usuario["paso"] = 2
@@ -59,21 +64,17 @@ def procesar_flujo(message):
         
         bot.send_message(chat_id, "⏳ Guardando registro en Google Sheets...")
         
-        # Estructuramos los datos en el orden exacto de tus columnas del Sheets
-        # Fila: [ID/Auto, Fecha, Cliente, Detalle/Tipo]
-        # Nota: Dejamos el ID en blanco para que lo llenes en Sheets, o puedes usar el chat_id
         payload = {
             "pestana": datos_usuario["pestana"],
             "datos": [
-                "", # Columna A: id (puedes dejarlo vacío o generar un correlativo)
-                datos_usuario["fecha"], # Columna B: fecha_registro
-                datos_usuario["cliente"], # Columna C: cliente
-                datos_usuario["detalle"]   # Columna D: tipo_tramite
+                "", 
+                datos_usuario["fecha"], 
+                datos_usuario["cliente"], 
+                datos_usuario["detalle"]  
             ]
         }
         
         try:
-            # Enviamos los datos al conector de Google
             response = requests.post(WEBAPP_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
             res_json = response.json()
             
@@ -84,11 +85,10 @@ def procesar_flujo(message):
         except Exception as e:
             bot.send_message(chat_id, f"❌ Fallo de conexión con la nube: {e}")
             
-        # Limpiar el estado de este usuario
+        # Limpiar el estado de este usuario y volver a mostrar el menú
         del user_data[chat_id]
         enviar_menu(message)
 
-# Iniciar el bot en modo escucha local
 if __name__ == "__main__":
     print("Bot corriendo...")
     bot.infinity_polling()
