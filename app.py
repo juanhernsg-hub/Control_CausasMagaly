@@ -1,7 +1,7 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
-import os
+from streamlit_gsheets import GSheetsConnection
+import io
 
 # Configuración estética de la interfaz
 st.set_page_config(page_title="Control de Causas - Magaly", layout="wide", page_icon="⚖️")
@@ -25,122 +25,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("⚖️ Escritorio Jurídico - Control Digital de Causas")
-st.markdown("Plataforma interactiva automatizada mediante sondeo local de datos en tiempo real.")
+st.markdown("Plataforma interactiva automatizada vinculada a Google Sheets en tiempo real.")
 
-DB_NAME = "C:/Users/Usuario/Documents/DASBOARD_MAGALY/datos.db"
-EXCEL_NAME = "C:/Users/Usuario/Documents/DASBOARD_MAGALY/Control_de_Causas_Digital.xlsx"
-
-def conectar_db():
-    return sqlite3.connect(DB_NAME)
-
-# Inicialización estructural basada en tus archivos reales
-def inicializar_tablas():
-    conn = conectar_db()
-    cursor = conn.cursor()
-    
-    # 1. Estructura para Trámites Administrativos
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS administrativos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            cliente TEXT,
-            tipo_tramite TEXT,
-            recaudos_recibidos TEXT,
-            tramites_realizados TEXT,
-            estatus TEXT,
-            registrado_por TEXT
-        )
-    ''')
-    
-    # 2. Estructura para Trámites Tribunalicios
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS tribunalicios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            circuito TEXT,
-            numero_expediente TEXT,
-            tribunal TEXT,
-            partes TEXT,
-            recurso TEXT,
-            actuaciones TEXT,
-            observaciones TEXT,
-            estatus TEXT,
-            registrado_por TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-inicializar_tablas()
-
-# --- FUNCIÓN DE RESPALDO Y EXPORTACIÓN SEGURA A EXCEL ---
-def exportar_a_excel_maestro(df_admin_raw, df_trib_raw):
-    df_a = df_admin_raw.copy()
-    df_t = df_trib_raw.copy()
-
-    # Intentamos exportar usando openpyxl si está disponible, sino usamos la exportación básica nativa
-    try:
-        import openpyxl
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-        from openpyxl.utils import get_column_letter
-
-        wb = openpyxl.Workbook()
-        font_title = Font(name="Calibri", size=15, bold=True, color="1B365D")
-        font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-        font_data = Font(name="Calibri", size=11)
-        fill_header = PatternFill(start_color="1B365D", end_color="1B365D", fill_type="solid")
-        thin_border = Border(left=Side(style="thin", color="D3D3D3"), right=Side(style="thin", color="D3D3D3"), top=Side(style="thin", color="D3D3D3"), bottom=Side(style="thin", color="D3D3D3"))
-        
-        # Hoja Administrativa
-        ws1 = wb.active
-        ws1.title = "Trámites Administrativos"
-        ws1.views.sheetView[0].showGridLines = True
-        ws1['A1'] = "CONTROL DE TRÁMITES ADMINISTRATIVOS"
-        ws1['A1'].font = font_title
-        
-        h_admin = ["ID", "Fecha Registro", "Cliente", "Tipo de Trámite", "Recaudos Recibidos", "Trámites Realizados", "Estado", "Registrado Por"]
-        for col_idx, text in enumerate(h_admin, 1):
-            cell = ws1.cell(row=3, column=col_idx, value=text)
-            cell.font = font_header; cell.fill = fill_header; cell.alignment = Alignment(horizontal="center", vertical="center")
-
-        for r_idx, row in enumerate(df_a.values, 4):
-            for c_idx, val in enumerate(row, 1):
-                cell = ws1.cell(row=r_idx, column=c_idx, value=val)
-                cell.font = font_data; cell.border = thin_border
-                cell.alignment = Alignment(horizontal="center" if c_idx in [1, 2, 7] else "left", vertical="center")
-
-        # Hoja Tribunalicia
-        ws2 = wb.create_sheet(title="Trámites Tribunalicios")
-        ws2.views.sheetView[0].showGridLines = True
-        ws2['A1'] = "CONTROL DE EXPEDIENTES Y CAUSAS TRIBUNALICIAS"
-        ws2['A1'].font = font_title
-        
-        h_trib = ["ID", "Fecha Registro", "Circuito", "N° Expediente", "Tribunal", "Partes", "Recurso", "Actuaciones", "Observaciones", "Estado", "Registrado Por"]
-        for col_idx, text in enumerate(h_trib, 1):
-            cell = ws2.cell(row=3, column=col_idx, value=text)
-            cell.font = font_header; cell.fill = fill_header; cell.alignment = Alignment(horizontal="center", vertical="center")
-
-        for r_idx, row in enumerate(df_t.values, 4):
-            for c_idx, val in enumerate(row, 1):
-                cell = ws2.cell(row=r_idx, column=c_idx, value=val)
-                cell.font = font_data; cell.border = thin_border
-                cell.alignment = Alignment(horizontal="center" if c_idx in [1, 2, 4, 10] else "left", vertical="center")
-
-        for ws in [ws1, ws2]:
-            for col in ws.columns:
-                max_len = 0
-                for cell in col:
-                    if cell.row == 1: continue
-                    if cell.value: max_len = max(max_len, len(str(cell.value)))
-                col_letter = get_column_letter(col[0].column)
-                ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
-                
-        wb.save(EXCEL_NAME)
-    except ImportError:
-        # CONTINGENCIA: Si no se puede importar openpyxl, guardamos el Excel básico sin estilos usando Pandas
-        with pd.ExcelWriter(EXCEL_NAME) as writer:
-            df_a.to_excel(writer, sheet_name="Trámites Administrativos", index=False)
-            df_t.to_excel(writer, sheet_name="Trámites Tribunalicios", index=False)
+# --- CONEXIÓN DIRECTA A GOOGLE SHEETS EN LA NUBE ---
+# Se utiliza el conector oficial configurado en secrets.toml
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- PANEL DE BÚSQUEDA LATERAL (UX) ---
 st.sidebar.markdown("### 🔍 Panel de Búsqueda Integrado")
@@ -150,14 +39,17 @@ estado_seleccionado = st.sidebar.selectbox("Filtrar por Estado actual:", ["Todos
 # --- RENDERIZADO ASÍNCRONO CADA 5 SEGUNDOS ---
 @st.fragment(run_every=5)
 def dibujar_interfaz_usuario():
-    conn = conectar_db()
-    df_admin = pd.read_sql_query("SELECT * FROM administrativos ORDER BY id DESC", conn)
-    df_tribunal = pd.read_sql_query("SELECT * FROM tribunalicios ORDER BY id DESC", conn)
-    conn.close()
+    try:
+        # Se leen las dos pestañas de tu Google Sheets de forma independiente
+        df_admin = conn.read(worksheet="administrativos", ttl="0m")
+        df_tribunal = conn.read(worksheet="tribunalicios", ttl="0m")
+    except Exception as e:
+        st.error(f"Error al conectar con Google Sheets. Verifica las pestañas: {e}")
+        return
 
     # Homologación de columnas para evitar fallos de inconsistencia de nombres
     for df in [df_admin, df_tribunal]:
-        if not df.empty:
+        if df is not None and not df.empty:
             if 'estatus' in df.columns:
                 df.rename(columns={'estatus': 'Estado'}, inplace=True)
             elif 'Estado' not in df.columns:
@@ -166,31 +58,28 @@ def dibujar_interfaz_usuario():
             if 'fecha_registro' in df.columns:
                 df['fecha_registro'] = df['fecha_registro'].astype(str).str.slice(0, 10)
 
-    # Intentar exportar a Excel en segundo plano
-    try:
-        exportar_a_excel_maestro(df_admin, df_tribunal)
-    except Exception:
-        pass
-
     # Aplicación de filtros interactivos
     if buscar_global:
-        if not df_admin.empty and 'cliente' in df_admin.columns:
+        if df_admin is not None and not df_admin.empty and 'cliente' in df_admin.columns:
             df_admin = df_admin[df_admin['cliente'].str.contains(buscar_global, case=False, na=False)]
-        if not df_tribunal.empty and 'partes' in df_tribunal.columns:
+        if df_tribunal is not None and not df_tribunal.empty and 'partes' in df_tribunal.columns:
             df_tribunal = df_tribunal[df_tribunal['partes'].str.contains(buscar_global, case=False, na=False) | df_tribunal['numero_expediente'].str.contains(buscar_global, case=False, na=False)]
         
     if estado_seleccionado != "Todos":
-        if not df_admin.empty:
+        if df_admin is not None and not df_admin.empty:
             df_admin = df_admin[df_admin['Estado'] == estado_seleccionado]
-        if not df_tribunal.empty:
+        if df_tribunal is not None and not df_tribunal.empty:
             df_tribunal = df_tribunal[df_tribunal['Estado'] == estado_seleccionado]
 
     # SECCIÓN DE MÓDULOS DE CONTROL (Tarjetas KPI)
-    cant_admin = len(df_admin)
-    cant_trib = len(df_tribunal)
+    cant_admin = len(df_admin) if df_admin is not None else 0
+    cant_trib = len(df_tribunal) if df_tribunal is not None else 0
     cant_activos = 0
-    if not df_admin.empty: cant_activos += len(df_admin[df_admin['Estado'] == 'Activo'])
-    if not df_tribunal.empty: cant_activos += len(df_tribunal[df_tribunal['Estado'] == 'Activo'])
+    
+    if df_admin is not None and not df_admin.empty: 
+        cant_activos += len(df_admin[df_admin['Estado'] == 'Activo'])
+    if df_tribunal is not None and not df_tribunal.empty: 
+        cant_activos += len(df_tribunal[df_tribunal['Estado'] == 'Activo'])
 
     m1, m2, m3 = st.columns(3)
     with m1:
@@ -206,7 +95,7 @@ def dibujar_interfaz_usuario():
     tab_admin, tab_trib = st.tabs(["🏢 Historial Administrativo", "🏛️ Expedientes Tribunalicios"])
 
     with tab_admin:
-        if not df_admin.empty:
+        if df_admin is not None and not df_admin.empty:
             st.dataframe(
                 df_admin, 
                 use_container_width=True, 
@@ -221,7 +110,7 @@ def dibujar_interfaz_usuario():
             st.info("No se registran trámites administrativos bajo los parámetros seleccionados.")
 
     with tab_trib:
-        if not df_tribunal.empty:
+        if df_tribunal is not None and not df_tribunal.empty:
             st.dataframe(
                 df_tribunal, 
                 use_container_width=True, 
@@ -236,15 +125,26 @@ def dibujar_interfaz_usuario():
         else:
             st.info("No se registran causas tribunalicias bajo los parámetros seleccionados.")
 
-    # ACCESO DIRECTO AL ARCHIVO DE RESPALDO EXCEL
+    # ACCESO DIRECTO AL ARCHIVO DE RESPALDO EXCEL GENERADO EN MEMORIA VIRTUAL
     st.markdown("### 📥 Descarga de Archivos Matrices")
-    if os.path.exists(EXCEL_NAME):
-        with open(EXCEL_NAME, "rb") as file:
-            st.download_button(
-                label="📥 Descargar Reporte Consolidado en Excel (.xlsx)",
-                data=file,
-                file_name="Control_de_Causas_Magaly.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+    
+    # Creamos el reporte de Excel en memoria virtual de la nube usando BytesIO
+    buffer = io.BytesIO()
+    try:
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            if df_admin is not None:
+                df_admin.to_excel(writer, sheet_name="Trámites Administrativos", index=False)
+            if df_tribunal is not None:
+                df_tribunal.to_excel(writer, sheet_name="Trámites Tribunalicios", index=False)
+        
+        st.download_button(
+            label="📥 Descargar Reporte Consolidado en Excel (.xlsx)",
+            data=buffer.getvalue(),
+            file_name="Control_de_Causas_Magaly.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        st.warning(f"El reporte de descarga en Excel se está procesando: {e}")
 
+# Ejecutar la UI
 dibujar_interfaz_usuario()
