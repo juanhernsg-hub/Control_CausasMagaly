@@ -36,13 +36,13 @@ def mostrar_tablero():
 
     # Intentar la carga de datos frescos
     df_admin = cargar_datos(URL_ADMIN)
-    df_tribunal = cargar_datos(URL_TRIBUNAL)
+    df_tribunal_causas = cargar_datos(URL_TRIBUNAL)
 
     # Mostrar indicador visual discreto del estado de actualización
     st.caption(f"🔄 Última sincronización automática: Hace un instante")
 
     # Crear la interfaz de pestañas en Streamlit
-    tab1, tab2 = st.tabs(["📁 Trámites Administrativos", "🏛️ Causas Tribunalicias"])
+    tab1, tab2 = st.tabs(["📁 Trámites Administrativos", "🏛️ tribunal_causas"])
 
     with tab1:
         st.subheader("Control de Casos Administrativos")
