@@ -17,8 +17,8 @@ user_data = {}
 def enviar_menu(message):
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     btn_admin = types.KeyboardButton('📁 Nuevo Trámite Administrativo')
-    btn_tribunal = types.KeyboardButton('🏛️ Nueva tribunal_causas')
-    markup.add(btn_admin, btn_tribunal)
+    btn_tribunal_causas = types.KeyboardButton('🏛️ Nueva tribunal_causas')
+    markup.add(btn_admin, btn_tribunal_causas)
     
     bot.send_message(
         message.chat.id, 
