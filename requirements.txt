@@ -1,4 +1,5 @@
 streamlit
+streamlit-gsheets
+gspread
+oauth2client
 pandas
-st-gsheets-connection
-pyTelegramBotAPI
