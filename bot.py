@@ -1,9 +1,12 @@
+import os
 import telebot
 from telebot import types
-import requests
-import json
-from datetime import datetime
-import zoneinfo
+
+# Lee las variables desde Railway
+TOKEN_TELEGRAM = os.environ.get("TOKEN_TELEGRAM")
+WEBAPP_URL = os.environ.get("WEBAPP_URL")
+
+bot = telebot.TeleBot(TOKEN_TELEGRAM)
 
 # 🔑 CONFIGURACIÓN PRINCIPAL
 TOKEN_TELEGRAM = "8867621977:AAE_fjmpD9aTnpgjfC5RHNEDSRhUsCwG6Ww"
