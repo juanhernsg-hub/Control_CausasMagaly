@@ -1,6 +1,6 @@
 import telebot
 from telebot import types
-from telebot import apihelper  # 🌐 IMPORTANTE para PythonAnywhere
+from telebot import apihelper  # 🌐 Obligatorio para PythonAnywhere
 import requests
 import json
 from datetime import datetime
@@ -8,11 +8,13 @@ import zoneinfo
 
 # 🔑 CONFIGURACIÓN PRINCIPAL
 TOKEN_TELEGRAM = "8867621977:AAEb3DJj0DjicE1_0WUK3cVFsMe3Ok-_YiA"
-# ⚠️ Pega aquí la nueva URL exacta que generaste en el paso anterior de Google Sheets
 WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwnQZ54IA3Jkivr2bMryDVy9qSFUyjCgvqeXnu2-jmcxZOLn7FRoqfIeRfngFojQ1bo/exec"
 
-# 🌐 CONFIGURACIÓN DEL PROXY OBLIGATORIO PARA CUENTAS GRATUITAS DE PYTHONANYWHERE
-apihelper.proxy = {'https': 'http://proxy.server:3128'}
+# 🌐 SOLUCIÓN PROXY 503: Configuración explícita de HTTP y HTTPS para PythonAnywhere
+apihelper.proxy = {
+    'http': 'http://proxy.server:3128',
+    'https': 'http://proxy.server:3128'
+}
 
 bot = telebot.TeleBot(TOKEN_TELEGRAM)
 
@@ -26,10 +28,14 @@ def usuario_autorizado(chat_id):
 def obtener_fecha_caracas():
     return datetime.now(zoneinfo.ZoneInfo("America/Caracas")).strftime("%Y-%m-%d %H:%M:%S")
 
+# 🧼 FUNCIÓN ANTI-CRASHEO: Evita errores de parseo si la celda tiene caracteres especiales
+def limpiar_html(texto):
+    return str(texto).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
 def enviar_menu(message):
     chat_id = message.chat.id
     if not usuario_autorizado(chat_id):
-        bot.send_message(chat_id, "❌ **Acceso Denegado:** No estás autorizado.", parse_mode="Markdown")
+        bot.send_message(chat_id, "❌ <b>Acceso Denegado:</b> No estás autorizado para usar este sistema jurídico.", parse_mode="HTML")
         return
 
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
@@ -39,7 +45,12 @@ def enviar_menu(message):
     markup.add(btn_admin, btn_tribunal)
     markup.add(btn_buscar)
 
-    bot.send_message(chat_id, "⚖️ **Escritorio Jurídico - Asistente de Control**\nSelecciona una opción:", parse_mode="Markdown", reply_markup=markup)
+    bot.send_message(
+        chat_id, 
+        "⚖️ <b>Escritorio Jurídico - Asistente de Control</b>\nSelecciona una opción:", 
+        parse_mode="HTML", 
+        reply_markup=markup
+    )
 
 @bot.message_handler(commands=['start'])
 def comando_start(message):
@@ -53,7 +64,7 @@ def manejar_opciones_menu(message):
     if message.text == '🔍 Buscar por ID':
         user_data[chat_id] = {"paso": "buscando_id"}
         markup = types.ReplyKeyboardRemove()
-        bot.send_message(chat_id, "🔢 Ingrese el **ID asignado** del caso que desea consultar:", parse_mode="Markdown", reply_markup=markup)
+        bot.send_message(chat_id, "🔢 Ingrese el <b>ID asignado</b> del caso que desea consultar:", parse_mode="HTML", reply_markup=markup)
         return
 
     pestana = "administrativos" if message.text == '📁 Nuevo Trámite Administrativo' else "tribunal_causas"
@@ -64,7 +75,7 @@ def manejar_opciones_menu(message):
         "paso": 1
     }
     markup = types.ReplyKeyboardRemove()
-    bot.send_message(chat_id, "👤 Ingrese el **Nombre del Cliente**:", parse_mode="Markdown", reply_markup=markup)
+    bot.send_message(chat_id, "👤 Ingrese el <b>Nombre del Cliente</b>:", parse_mode="HTML", reply_markup=markup)
 
 @bot.message_handler(func=lambda message: message.chat.id in user_data)
 def procesar_flujo(message):
@@ -77,12 +88,17 @@ def procesar_flujo(message):
     # --- FLUJO DE BÚSQUEDA ---
     if paso_actual == "buscando_id":
         id_buscado = message.text.strip()
-        bot.send_message(chat_id, f"🔍 Buscando el ID **{id_buscado}** en la base de datos...", parse_mode="Markdown")
+        bot.send_message(chat_id, f"🔍 Buscando el ID <b>{id_buscado}</b> en la base de datos...", parse_mode="HTML")
 
         payload = {"accion": "buscar", "id": id_buscado}
 
         try:
-            response = requests.post(WEBAPP_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"}, timeout=15)
+            response = requests.post(
+                WEBAPP_URL, 
+                data=json.dumps(payload, ensure_ascii=False).encode('utf-8'), 
+                headers={"Content-Type": "application/json"}, 
+                timeout=15
+            )
             
             if response.status_code == 200:
                 res_json = response.json()
@@ -93,32 +109,33 @@ def procesar_flujo(message):
                     if isinstance(info, list):
                         while len(info) < 8: info.append("")
                         
-                        id_caso  = info[0] if info[0] else id_buscado
-                        fecha    = info[1] if info[1] else "No registrada"
-                        cliente  = info[2] if info[2] else "No definido"
-                        tramite  = info[3] if info[3] else "No definido"
-                        recaudos = info[4] if info[4] else "Ninguno"
-                        acciones = info[5] if info[5] else "Ninguna"
-                        estado   = info[6] if info[6] else "Sin estado"
-                        operador = info[7] if info[7] else "No especificado"
+                        # Limpieza estricta de variables devueltas
+                        id_caso  = limpiar_html(info[0] if info[0] else id_buscado)
+                        fecha    = limpiar_html(info[1] if info[1] else "No registrada")
+                        cliente  = limpiar_html(info[2] if info[2] else "No definido")
+                        tramite  = limpiar_html(info[3] if info[3] else "No definido")
+                        recaudos = limpiar_html(info[4] if info[4] else "Ninguno")
+                        acciones = limpiar_html(info[5] if info[5] else "Ninguna")
+                        estado   = limpiar_html(info[6] if info[6] else "Sin estado")
+                        operador = limpiar_html(info[7] if info[7] else "No especificado")
 
                         reporte = (
-                            f"📄 **Información del Caso [{id_caso}]**\n"
+                            f"📄 <b>Información del Caso [{id_caso}]</b>\n"
                             f"----------------------------------------\n"
-                            f"📂 **Sección:** {str(pestana_encontrada).upper()}\n"
-                            f"📅 **Fecha Reg:** {fecha}\n"
-                            f"👤 **Cliente:** {cliente}\n"
-                            f"📝 **Trámite:** {tramite}\n"
-                            f"📥 **Recaudos:** {recaudos}\n"
-                            f"🛠️ **Acciones:** {acciones}\n"
-                            f"⏳ **Estado:** {estado}\n"
-                            f"👤 **Operador:** {operador}"
+                            f"📂 <b>Sección:</b> {str(pestana_encontrada).upper()}\n"
+                            f"📅 <b>Fecha Reg:</b> {fecha}\n"
+                            f"👤 <b>Cliente:</b> {cliente}\n"
+                            f"📝 <b>Trámite:</b> {tramite}\n"
+                            f"📥 <b>Recaudos:</b> {recaudos}\n"
+                            f"🛠️ <b>Acciones:</b> {acciones}\n"
+                            f"⏳ <b>Estado:</b> {estado}\n"
+                            f"👤 <b>Operador:</b> {operador}"
                         )
-                        bot.send_message(chat_id, reporte, parse_mode="Markdown")
+                        bot.send_message(chat_id, reporte, parse_mode="HTML")
                     else:
-                        bot.send_message(chat_id, "⚠️ Los datos no tienen un formato válido.")
+                        bot.send_message(chat_id, "⚠️ Los datos devueltos no tienen un formato de lista válido.")
                 else:
-                    bot.send_message(chat_id, f"❌ {res_json.get('message', 'Error al buscar el ID.')}")
+                    bot.send_message(chat_id, f"❌ {res_json.get('message', 'Error al procesar la búsqueda.')}")
             else:
                 bot.send_message(chat_id, f"❌ Error de comunicación con Google (HTTP {response.status_code}).")
                 
@@ -133,24 +150,24 @@ def procesar_flujo(message):
     if paso_actual == 1:
         datos_usuario["cliente"] = message.text
         datos_usuario["paso"] = 2
-        bot.send_message(chat_id, "📝 Ingrese el **Tipo de Trámite o Causa**:", parse_mode="Markdown")
+        bot.send_message(chat_id, "📝 Ingrese el <b>Tipo de Trámite o Causa</b>:", parse_mode="HTML")
 
     elif paso_actual == 2:
         datos_usuario["tipo_tramite"] = message.text
         datos_usuario["paso"] = 3
-        bot.send_message(chat_id, "📂 Ingrese los **Recaudos Recibidos**:", parse_mode="Markdown")
+        bot.send_message(chat_id, "📂 Ingrese los <b>Recaudos Recibidos</b>:", parse_mode="HTML")
 
     elif paso_actual == 3:
         datos_usuario["recaudos_recibidos"] = message.text
         datos_usuario["paso"] = 4
-        bot.send_message(chat_id, "🛠️ Ingrese los **Trámites Realizados**:", parse_mode="Markdown")
+        bot.send_message(chat_id, "🛠️ Ingrese los <b>Trámites Realizados</b>:", parse_mode="HTML")
 
     elif paso_actual == 4:
         datos_usuario["tramites_realizados"] = message.text
         datos_usuario["paso"] = 5
         markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
         markup.add('En Proceso', 'En Revisión', 'Completado', 'Suspendido')
-        bot.send_message(chat_id, "⏳ Seleccione o escriba el **Estado** del caso:", parse_mode="Markdown", reply_markup=markup)
+        bot.send_message(chat_id, "⏳ Seleccione o escriba el <b>Estado</b> del caso:", parse_mode="HTML", reply_markup=markup)
 
     elif paso_actual == 5:
         datos_usuario["estado"] = message.text
@@ -164,11 +181,17 @@ def procesar_flujo(message):
         }
 
         try:
-            response = requests.post(WEBAPP_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"}, timeout=15)
+            response = requests.post(
+                WEBAPP_URL, 
+                data=json.dumps(payload, ensure_ascii=False).encode('utf-8'), 
+                headers={"Content-Type": "application/json"}, 
+                timeout=15
+            )
+            
             if response.status_code == 200:
                 res_json = response.json()
                 if res_json.get("status") == "success":
-                    bot.send_message(chat_id, "✅ **¡Caso guardado con éxito!**", parse_mode="Markdown")
+                    bot.send_message(chat_id, "✅ <b>¡Caso guardado con éxito!</b>", parse_mode="HTML")
                 else:
                     bot.send_message(chat_id, f"❌ Error: {res_json.get('message')}")
             else:
@@ -180,7 +203,7 @@ def procesar_flujo(message):
         enviar_menu(message)
 
 if __name__ == "__main__":
-    print("🧹 Limpiando webhooks...")
+    print("Base limpia de webhooks...")
     bot.remove_webhook()
-    print("🚀 Bot iniciado correctamente en PythonAnywhere.")
+    print("🚀 Bot iniciado correctamente en PythonAnywhere con blindaje HTML y Proxy Corregido.")
     bot.infinity_polling()
