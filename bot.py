@@ -1,5 +1,6 @@
 import telebot
 from telebot import types
+from telebot import apihelper  # 🌐 IMPORTANTE para PythonAnywhere
 import requests
 import json
 from datetime import datetime
@@ -7,11 +8,15 @@ import zoneinfo
 
 # 🔑 CONFIGURACIÓN PRINCIPAL
 TOKEN_TELEGRAM = "8867621977:AAGVh7ZqNj27QZeIptBGftQv0jnFMJDbt0k"
-# ⚠️ Asegúrate de cambiar esta URL por la nueva que generes en el Paso 2
+# ⚠️ Pega aquí la nueva URL exacta que generaste en el paso anterior de Google Sheets
 WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwnQZ54IA3Jkivr2bMryDVy9qSFUyjCgvqeXnu2-jmcxZOLn7FRoqfIeRfngFojQ1bo/exec"
+
+# 🌐 CONFIGURACIÓN DEL PROXY OBLIGATORIO PARA CUENTAS GRATUITAS DE PYTHONANYWHERE
+apihelper.proxy = {'https': 'http://proxy.server:3128'}
 
 bot = telebot.TeleBot(TOKEN_TELEGRAM)
 
+# 🛡️ LISTA DE USUARIOS AUTORIZADOS
 USUARIOS_PERMITIDOS = [8375789261, 5615273235]
 user_data = {}
 
@@ -24,7 +29,7 @@ def obtener_fecha_caracas():
 def enviar_menu(message):
     chat_id = message.chat.id
     if not usuario_autorizado(chat_id):
-        bot.send_message(chat_id, "❌ **Acceso Denegado:** No estás autorizado para usar este sistema jurídico.", parse_mode="Markdown")
+        bot.send_message(chat_id, "❌ **Acceso Denegado:** No estás autorizado.", parse_mode="Markdown")
         return
 
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
@@ -77,7 +82,6 @@ def procesar_flujo(message):
         payload = {"accion": "buscar", "id": id_buscado}
 
         try:
-            # Añadimos timeout de 15 segundos para que no se quede colgado eternamente si Google falla
             response = requests.post(WEBAPP_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"}, timeout=15)
             
             if response.status_code == 200:
@@ -112,16 +116,14 @@ def procesar_flujo(message):
                         )
                         bot.send_message(chat_id, reporte, parse_mode="Markdown")
                     else:
-                        bot.send_message(chat_id, "⚠️ Formato de respuesta de base de datos inválido.")
+                        bot.send_message(chat_id, "⚠️ Los datos no tienen un formato válido.")
                 else:
-                    bot.send_message(chat_id, f"❌ {res_json.get('message', 'Error interno al buscar.')}")
+                    bot.send_message(chat_id, f"❌ {res_json.get('message', 'Error al buscar el ID.')}")
             else:
-                print(f"🚨 Error en consola: Google respondió con HTTP {response.status_code}")
-                bot.send_message(chat_id, f"❌ Servidor de Google no disponible (Error {response.status_code}). Inténtalo de nuevo en unos minutos.")
+                bot.send_message(chat_id, f"❌ Error de comunicación con Google (HTTP {response.status_code}).")
                 
         except Exception as e:
-            print(f"🚨 Error de Conexión: {e}")
-            bot.send_message(chat_id, f"❌ Error de conexión con la base de datos: {e}")
+            bot.send_message(chat_id, f"❌ Error de conexión: {e}")
 
         if chat_id in user_data: del user_data[chat_id]
         enviar_menu(message)
@@ -136,12 +138,12 @@ def procesar_flujo(message):
     elif paso_actual == 2:
         datos_usuario["tipo_tramite"] = message.text
         datos_usuario["paso"] = 3
-        bot.send_message(chat_id, "📂 Ingrese los **Recaudos Recibidos** (Ej: Copia de Cédula, Título, Ninguno):", parse_mode="Markdown")
+        bot.send_message(chat_id, "📂 Ingrese los **Recaudos Recibidos**:", parse_mode="Markdown")
 
     elif paso_actual == 3:
         datos_usuario["recaudos_recibidos"] = message.text
         datos_usuario["paso"] = 4
-        bot.send_message(chat_id, "🛠️ Ingrese los **Trámites Realizados** hasta ahora:", parse_mode="Markdown")
+        bot.send_message(chat_id, "🛠️ Ingrese los **Trámites Realizados**:", parse_mode="Markdown")
 
     elif paso_actual == 4:
         datos_usuario["tramites_realizados"] = message.text
@@ -170,7 +172,7 @@ def procesar_flujo(message):
                 else:
                     bot.send_message(chat_id, f"❌ Error: {res_json.get('message')}")
             else:
-                bot.send_message(chat_id, f"❌ El servidor de Google respondió con error {response.status_code}")
+                bot.send_message(chat_id, f"❌ Error {response.status_code} en el servidor de Google.")
         except Exception as e:
             bot.send_message(chat_id, f"❌ Fallo de conexión: {e}")
 
@@ -178,7 +180,7 @@ def procesar_flujo(message):
         enviar_menu(message)
 
 if __name__ == "__main__":
-    print("🧹 Limpiando webhooks anteriores...")
+    print("🧹 Limpiando webhooks...")
     bot.remove_webhook()
-    print("Bot corriendo de forma local con éxito...")
+    print("🚀 Bot iniciado correctamente en PythonAnywhere.")
     bot.infinity_polling()
