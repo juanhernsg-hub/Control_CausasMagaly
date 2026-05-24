@@ -7,7 +7,7 @@ import zoneinfo
 
 # 🔑 CONFIGURACIÓN PRINCIPAL
 TOKEN_TELEGRAM = "8867621977:AAGVh7ZqNj27QZeIptBGftQv0jnFMJDbt0k"
-WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxvkfqb-2OoyoQgpHw2G6xNWoKDxokKXKRIPer-RCO2Or9tI3L9zj1jdnWMbeFyPZAg/exec"
+WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwnQZ54IA3Jkivr2bMryDVy9qSFUyjCgvqeXnu2-jmcxZOLn7FRoqfIeRfngFojQ1bo/exec"
 
 # 🌐 PARCHE REMOVIDO: Como estás en local, ya no necesitas 'apihelper.proxy'
 bot = telebot.TeleBot(TOKEN_TELEGRAM)
