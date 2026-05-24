@@ -1,4 +1,4 @@
-import telebot
+import telebot  
 from telebot import types
 import requests
 import json
@@ -111,46 +111,27 @@ def procesar_flujo(message):
 
             if res_json.get("status") == "success":
                 info = res_json.get("data")
-                pestana_encontrada = res_json.get("pestana_encontrada", "No especificada")
                 
-                if isinstance(info, list):
-                    # 🛠️ AJUSTE ANTICAÍDAS: Rellena con vacíos si la fila en Sheets tiene menos de 8 columnas
-                    while len(info) < 8:
-                        info.append("")
-                    
-                    # Validación uno a uno para evitar crasheos si hay celdas vacías
-                    id_caso  = info[0] if info[0] else id_buscado
-                    fecha    = info[1] if info[1] else "No registrada"
-                    cliente  = info[2] if info[2] else "No definido"
-                    tramite  = info[3] if info[3] else "No definido"
-                    recaudos = info[4] if info[4] else "Ninguno"
-                    acciones = info[5] if info[5] else "Ninguna"
-                    estado   = info[6] if info[6] else "Sin estado"
-                    operador = info[7] if info[7] else "No especificado"
-
-                    reporte = (
-                        f"📄 **Información del Caso [{id_caso}]**\n"
-                        f"----------------------------------------\n"
-                        f"📂 **Sección:** {str(pestana_encontrada).upper()}\n"
-                        f"📅 **Fecha Reg:** {fecha}\n"
-                        f"👤 **Cliente:** {cliente}\n"
-                        f"📝 **Trámite:** {tramite}\n"
-                        f"📥 **Recaudos:** {recaudos}\n"
-                        f"🛠️ **Acciones:** {acciones}\n"
-                        f"⏳ **Estado:** {estado}\n"
-                        f"👤 **Operador:** {operador}"
-                    )
-                    bot.send_message(chat_id, reporte, parse_mode="Markdown")
-                else:
-                    bot.send_message(chat_id, "⚠️ Los datos del caso no tienen un formato de lista válido.")
+                reporte = (
+                    f"📄 **Información del Caso [{id_buscado}]**\n"
+                    f"----------------------------------------\n"
+                    f"📂 **Sección:** {res_json.get('pestana_encontrada')}\n"
+                    f"📅 **Fecha Reg:** {info[1]}\n"
+                    f"👤 **Cliente:** {info[2]}\n"
+                    f"📝 **Trámite:** {info[3]}\n"
+                    f"📥 **Recaudos:** {info[4]}\n"
+                    f"🛠️ **Acciones:** {info[5]}\n"
+                    f"⏳ **Estado:** {info[6]}\n"
+                    f"👤 **Operador:** {info[7]}"
+                )
+                bot.send_message(chat_id, reporte, parse_mode="Markdown")
             else:
-                bot.send_message(chat_id, f"❌ {res_json.get('message', 'Error desconocido al buscar.')}")
+                bot.send_message(chat_id, f"❌ {res_json.get('message')}")
                 
         except Exception as e:
-            bot.send_message(chat_id, f"❌ Error al conectar con la base de datos o procesar la fila: {e}")
+            bot.send_message(chat_id, f"❌ Error al conectar con la base de datos: {e}")
 
-        if chat_id in user_data:
-            del user_data[chat_id]
+        del user_data[chat_id]
         enviar_menu(message)
         return
 
@@ -210,8 +191,7 @@ def procesar_flujo(message):
         except Exception as e:
             bot.send_message(chat_id, f"❌ Fallo de conexión: {e}")
 
-        if chat_id in user_data:
-            del user_data[chat_id]
+        del user_data[chat_id]
         enviar_menu(message)
 
 if __name__ == "__main__":
