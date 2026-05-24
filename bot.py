@@ -95,7 +95,7 @@ def procesar_flujo(message):
     datos_usuario = user_data[chat_id]
     paso_actual = datos_usuario["paso"]
 
-    # --- FLUJO DE BÚSQUEDA ---
+   # --- FLUJO DE BÚSQUEDA ---
     if paso_actual == "buscando_id":
         id_buscado = message.text.strip()
         bot.send_message(chat_id, f"🔍 Buscando el ID **{id_buscado}** en la base de datos...", parse_mode="Markdown")
@@ -109,13 +109,27 @@ def procesar_flujo(message):
             response = requests.post(WEBAPP_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
             res_json = response.json()
 
+            # 🛠️ VERIFICACIÓN PRIMARIA: ¿Google Sheets encontró el caso con éxito?
             if res_json.get("status") == "success":
                 info = res_json.get("data")
+                pestana_real = res_json.get("pestana_encontrada")
                 
+                # Si 'info' no es una lista o está vacía, evitamos que rompa el script
+                if not info or not isinstance(info, list):
+                    bot.send_message(chat_id, "⚠️ Google Sheets devolvió un formato de datos inválido.")
+                    del user_data[chat_id]
+                    enviar_menu(message)
+                    return
+
+                # Rellenamos la lista con textos genéricos si la fila en Sheets tiene columnas vacías
+                while len(info) < 8:
+                    info.append("No registrado")
+
+                # Ahora es 100% seguro estructurar el reporte sin riesgo de 'undefined' o caídas
                 reporte = (
                     f"📄 **Información del Caso [{id_buscado}]**\n"
                     f"----------------------------------------\n"
-                    f"📂 **Sección:** {res_json.get('pestana_encontrada')}\n"
+                    f"📂 **Sección:** {str(pestana_real).upper()}\n"
                     f"📅 **Fecha Reg:** {info[1]}\n"
                     f"👤 **Cliente:** {info[2]}\n"
                     f"📝 **Trámite:** {info[3]}\n"
@@ -125,12 +139,16 @@ def procesar_flujo(message):
                     f"👤 **Operador:** {info[7]}"
                 )
                 bot.send_message(chat_id, reporte, parse_mode="Markdown")
+            
             else:
-                bot.send_message(chat_id, f"❌ {res_json.get('message')}")
+                # Si Google Sheets explícitamente mandó un error (ej: ID no encontrado)
+                mensaje_error = res_json.get("message", "Error desconocido en el servidor de Google.")
+                bot.send_message(chat_id, f"❌ **Error de Base de Datos:** {mensaje_error}")
                 
         except Exception as e:
-            bot.send_message(chat_id, f"❌ Error al conectar con la base de datos: {e}")
+            bot.send_message(chat_id, f"❌ Error al conectar con la base de datos o procesar JSON: {e}")
 
+        # Limpieza obligatoria del estado del usuario para desbloquear el menú
         del user_data[chat_id]
         enviar_menu(message)
         return
