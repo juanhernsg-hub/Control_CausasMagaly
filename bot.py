@@ -82,70 +82,136 @@ def procesar_flujo(message):
     chat_id = message.chat.id
     if not usuario_autorizado(chat_id): return
 
-    datos_usuario = user_data[chat_id]
-    paso_actual = datos_usuario["paso"]
+    # GENERADOR DE ID PROFESIONAL
 
-    # --- FLUJO DE BÚSQUEDA ---
-    if paso_actual == "buscando_id":
-        id_buscado = message.text.strip()
-        bot.send_message(chat_id, f"🔍 Buscando el ID <b>{id_buscado}</b> en la base de datos...", parse_mode="HTML")
+prefijo = "TR" if datos_usuario["pestana"] == "tribunal_causas" else "AD"
 
-        payload = {"accion": "buscar", "id": id_buscado}
+nuevo_id = f"{prefijo}-{datetime.now().strftime('%H%M%S')}"
 
-        try:
-            response = requests.post(
-                WEBAPP_URL, 
-                data=json.dumps(payload, ensure_ascii=False).encode('utf-8'), 
-                headers={"Content-Type": "application/json"}, 
-                timeout=15
-            )
-            
-            if response.status_code == 200:
-                res_json = response.json()
-                if res_json.get("status") == "success":
-                    info = res_json.get("data")
-                    pestana_encontrada = res_json.get("pestana_encontrada", "No especificada")
-                    
-                    if isinstance(info, list):
-                        while len(info) < 8: info.append("")
-                        
-                        # Limpieza estricta de variables devueltas
-                        id_caso  = limpiar_html(info[0] if info[0] else id_buscado)
-                        fecha    = limpiar_html(info[1] if info[1] else "No registrada")
-                        cliente  = limpiar_html(info[2] if info[2] else "No definido")
-                        tramite  = limpiar_html(info[3] if info[3] else "No definido")
-                        recaudos = limpiar_html(info[4] if info[4] else "Ninguno")
-                        acciones = limpiar_html(info[5] if info[5] else "Ninguna")
-                        estado   = limpiar_html(info[6] if info[6] else "Sin estado")
-                        operador = limpiar_html(info[7] if info[7] else "No especificado")
+payload = {
+    "accion": "guardar",
+    "pestana": datos_usuario["pestana"],
+    "datos": [
+        nuevo_id,
+        datos_usuario["fecha"],
+        datos_usuario["cliente"],
+        datos_usuario["tipo_tramite"],
+        datos_usuario["recaudos_recibidos"],
+        datos_usuario["tramites_realizados"],
+        datos_usuario["estado"],
+        datos_usuario["registrado_por"]
+    ]
+}
 
-                        reporte = (
-                            f"📄 <b>Información del Caso [{id_caso}]</b>\n"
-                            f"----------------------------------------\n"
-                            f"📂 <b>Sección:</b> {str(pestana_encontrada).upper()}\n"
-                            f"📅 <b>Fecha Reg:</b> {fecha}\n"
-                            f"👤 <b>Cliente:</b> {cliente}\n"
-                            f"📝 <b>Trámite:</b> {tramite}\n"
-                            f"📥 <b>Recaudos:</b> {recaudos}\n"
-                            f"🛠️ <b>Acciones:</b> {acciones}\n"
-                            f"⏳ <b>Estado:</b> {estado}\n"
-                            f"👤 <b>Operador:</b> {operador}"
-                        )
-                        bot.send_message(chat_id, reporte, parse_mode="HTML")
-                    else:
-                        bot.send_message(chat_id, "⚠️ Los datos devueltos no tienen un formato de lista válido.")
+    # --- FLUJO DE BÚSQUEDA CORREGIDO ---
+if paso_actual == "buscando_id":
+
+    id_buscado = message.text.strip().upper()
+
+    # Limpieza de seguridad
+    id_buscado = id_buscado.replace("TRIBUNALES_CAUSAS", "").replace("ADMINISTRATIVOS", "").strip()
+
+    bot.send_message(
+        chat_id,
+        f"🔍 Buscando el ID <b>{id_buscado}</b> en la base de datos...",
+        parse_mode="HTML"
+    )
+
+    payload = {
+        "accion": "buscar",
+        "id": id_buscado
+    }
+
+    try:
+
+        response = requests.post(
+            WEBAPP_URL,
+            data=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
+            headers={"Content-Type": "application/json"},
+            timeout=15
+        )
+
+        if response.status_code == 200:
+
+            res_json = response.json()
+
+            if res_json.get("status") == "success":
+
+                info = res_json.get("data")
+                pestana_encontrada = res_json.get("pestana_encontrada", "No especificada")
+
+                if isinstance(info, list):
+
+                    while len(info) < 8:
+                        info.append("")
+
+                    # DATOS LIMPIOS
+                    id_caso  = limpiar_html(info[0] if info[0] else id_buscado)
+                    fecha_raw = str(info[1]) if info[1] else ""
+
+                    # FORMATEO PROFESIONAL DE FECHA
+                    try:
+                        fecha_dt = datetime.fromisoformat(fecha_raw.replace("Z", ""))
+                        fecha = fecha_dt.strftime("%d/%m/%Y %I:%M %p")
+                    except:
+                        fecha = fecha_raw
+
+                    cliente  = limpiar_html(info[2] if info[2] else "No definido")
+                    tramite  = limpiar_html(info[3] if info[3] else "No definido")
+                    recaudos = limpiar_html(info[4] if info[4] else "Ninguno")
+                    acciones = limpiar_html(info[5] if info[5] else "Ninguna")
+                    estado   = limpiar_html(info[6] if info[6] else "Sin estado")
+                    operador = limpiar_html(info[7] if info[7] else "No especificado")
+
+                    reporte = (
+                        f"📄 <b>Información del Caso [{id_caso}]</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━\n"
+                        f"📂 <b>Sección:</b> {str(pestana_encontrada).upper()}\n"
+                        f"📅 <b>Fecha:</b> {fecha}\n"
+                        f"👤 <b>Cliente:</b> {cliente}\n"
+                        f"📝 <b>Trámite:</b> {tramite}\n"
+                        f"📥 <b>Recaudos:</b> {recaudos}\n"
+                        f"🛠️ <b>Acciones:</b> {acciones}\n"
+                        f"⏳ <b>Estado:</b> {estado}\n"
+                        f"👨‍💼 <b>Operador:</b> {operador}"
+                    )
+
+                    bot.send_message(
+                        chat_id,
+                        reporte,
+                        parse_mode="HTML"
+                    )
+
                 else:
-                    bot.send_message(chat_id, f"❌ {res_json.get('message', 'Error al procesar la búsqueda.')}")
+                    bot.send_message(
+                        chat_id,
+                        "⚠️ Formato inválido recibido desde Google Sheets."
+                    )
+
             else:
-                bot.send_message(chat_id, f"❌ Error de comunicación con Google (HTTP {response.status_code}).")
-                
-        except Exception as e:
-            bot.send_message(chat_id, f"❌ Error de conexión: {e}")
+                bot.send_message(
+                    chat_id,
+                    f"❌ {res_json.get('message', 'No se encontró el caso.')}"
+                )
 
-        if chat_id in user_data: del user_data[chat_id]
-        enviar_menu(message)
-        return
+        else:
+            bot.send_message(
+                chat_id,
+                f"❌ Error HTTP {response.status_code} con Google Sheets."
+            )
 
+    except Exception as e:
+
+        bot.send_message(
+            chat_id,
+            f"❌ Error de conexión:\n{e}"
+        )
+
+    if chat_id in user_data:
+        del user_data[chat_id]
+
+    enviar_menu(message)
+    return
     # --- FLUJO DE REGISTRO ORIGINAL ---
     if paso_actual == 1:
         datos_usuario["cliente"] = message.text
