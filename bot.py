@@ -4,12 +4,12 @@ import requests
 import json
 from datetime import datetime
 import zoneinfo
-import base64
 
 # 🔑 CONFIGURACIÓN PRINCIPAL
 TOKEN_TELEGRAM = "8867621977:AAGVh7ZqNj27QZeIptBGftQv0jnFMJDbt0k"
 WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxvkfqb-2OoyoQgpHw2G6xNWoKDxokKXKRIPer-RCO2Or9tI3L9zj1jdnWMbeFyPZAg/exec"
 
+# 🌐 PARCHE REMOVIDO: Como estás en local, ya no necesitas 'apihelper.proxy'
 bot = telebot.TeleBot(TOKEN_TELEGRAM)
 
 # 🛡️ LISTA DE USUARIOS AUTORIZADOS
@@ -83,62 +83,7 @@ def manejar_opciones_menu(message):
     }
 
     markup = types.ReplyKeyboardRemove()
-    bot.send_message(chat_id, "👤 Ingrese o dicte el **Nombre del Cliente**:", parse_mode="Markdown", reply_markup=markup)
-
-
-# 🎤 MANEJADOR DE DICTADO POR VOZ (NOTAS DE VOZ Y AUDIO)
-@bot.message_handler(content_types=['voice', 'audio'])
-def manejar_dictado_voz(message):
-    chat_id = message.chat.id
-
-    if not usuario_autorizado(chat_id):
-        return
-
-    # Si el usuario no ha iniciado ningún flujo operativo, ignoramos el audio
-    if chat_id not in user_data:
-        bot.send_message(chat_id, "⚠️ Por favor, selecciona una opción del menú antes de enviar una nota de voz.")
-        return
-
-    bot.send_message(chat_id, "🎤 Procesando nota de voz, por favor espera...", parse_mode="Markdown")
-
-    try:
-        # 1. Obtener identificador único del archivo de audio enviado
-        file_id = message.voice.file_id if message.voice else message.audio.file_id
-        file_info = bot.get_file(file_id)
-        
-        # 2. Descargar los bytes crudos del archivo desde los servidores de Telegram
-        downloaded_file = bot.download_file(file_info.file_path)
-        
-        # 3. Convertir a Base64 plano para empaquetarlo sin conflictos dentro del JSON
-        audio_base64 = base64.b64encode(downloaded_file).decode('utf-8')
-
-        # 4. Enviar carga útil a Google Apps Script para transcribir
-        payload = {
-            "tipo": "transcribir",
-            "audio": audio_base64
-        }
-        
-        response = requests.post(WEBAPP_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
-        res_json = response.json()
-
-        if res_json.get("status") == "success":
-            texto_transcrito = res_json.get("texto", "").strip()
-            
-            if not texto_transcrito:
-                bot.send_message(chat_id, "⚠️ El audio fue procesado pero no se detectó ningún texto hablado.")
-                return
-            
-            bot.send_message(chat_id, f"📝 **Texto interpretado:** {texto_transcrito}", parse_mode="Markdown")
-            
-            # Reinyectamos artificialmente el texto dictado al flujo interactivo de preguntas
-            message.text = texto_transcrito
-            procesar_flujo(message)
-        else:
-            bot.send_message(chat_id, f"❌ Error del transcriptor en la hoja: {res_json.get('message')}")
-
-    except Exception as e:
-        bot.send_message(chat_id, f"❌ Fallo crítico al procesar tu dictado de voz: {e}")
-
+    bot.send_message(chat_id, "👤 Ingrese el **Nombre del Cliente**:", parse_mode="Markdown", reply_markup=markup)
 
 @bot.message_handler(func=lambda message: message.chat.id in user_data)
 def procesar_flujo(message):
@@ -150,7 +95,7 @@ def procesar_flujo(message):
     datos_usuario = user_data[chat_id]
     paso_actual = datos_usuario["paso"]
 
-    # --- 🔍 FLUJO DE BÚSQUEDA ---
+    # --- FLUJO DE BÚSQUEDA ---
     if paso_actual == "buscando_id":
         id_buscado = message.text.strip()
         bot.send_message(chat_id, f"🔍 Buscando el ID **{id_buscado}** en la base de datos...", parse_mode="Markdown")
@@ -166,68 +111,64 @@ def procesar_flujo(message):
 
             if res_json.get("status") == "success":
                 info = res_json.get("data")
-                pestana_real = res_json.get("pestana_encontrada", "Desconocida")
+                pestana_encontrada = res_json.get("pestana_encontrada", "No especificada")
                 
-                if not info or not isinstance(info, list):
-                    bot.send_message(chat_id, "⚠️ El caso existe, pero el formato interno de celdas no es válido.")
-                    del user_data[chat_id]
-                    enviar_menu(message)
-                    return
+                if isinstance(info, list):
+                    # 🛠️ AJUSTE ANTICAÍDAS: Rellena con vacíos si la fila en Sheets tiene menos de 8 columnas
+                    while len(info) < 8:
+                        info.append("")
+                    
+                    # Validación uno a uno para evitar crasheos si hay celdas vacías
+                    id_caso  = info[0] if info[0] else id_buscado
+                    fecha    = info[1] if info[1] else "No registrada"
+                    cliente  = info[2] if info[2] else "No definido"
+                    tramite  = info[3] if info[3] else "No definido"
+                    recaudos = info[4] if info[4] else "Ninguno"
+                    acciones = info[5] if info[5] else "Ninguna"
+                    estado   = info[6] if info[6] else "Sin estado"
+                    operador = info[7] if info[7] else "No especificado"
 
-                # 🛠️ AJUSTE ANTICAÍDAS: Si la fila tiene menos columnas de las necesarias,
-                # extendemos la lista dinámicamente para que info[1] ... info[7] siempre existan
-                while len(info) < 8:
-                    info.append("")
-
-                # Evaluamos los campos para descartar valores vacíos o nulos
-                id_caso   = info[0] if info[0] else id_buscado
-                fecha     = info[1] if info[1] else "No registrada"
-                cliente   = info[2] if info[2] else "No definido"
-                tramite   = info[3] if info[3] else "No definido"
-                recaudos  = info[4] if info[4] else "Ninguno"
-                acciones  = info[5] if info[5] else "Ninguna"
-                estado    = info[6] if info[6] else "Sin asignar"
-                operador  = info[7] if info[7] else "No especificado"
-                
-                reporte = (
-                    f"📄 **Información del Caso [{id_caso}]**\n"
-                    f"----------------------------------------\n"
-                    f"📂 **Sección:** {str(pestana_real).upper()}\n"
-                    f"📅 **Fecha Reg:** {fecha}\n"
-                    f"👤 **Cliente:** {cliente}\n"
-                    f"📝 **Trámite:** {tramite}\n"
-                    f"📥 **Recaudos:** {recaudos}\n"
-                    f"🛠️ **Acciones:** {acciones}\n"
-                    f"⏳ **Estado:** {estado}\n"
-                    f"👤 **Operador:** {operador}"
-                )
-                bot.send_message(chat_id, reporte, parse_mode="Markdown")
+                    reporte = (
+                        f"📄 **Información del Caso [{id_caso}]**\n"
+                        f"----------------------------------------\n"
+                        f"📂 **Sección:** {str(pestana_encontrada).upper()}\n"
+                        f"📅 **Fecha Reg:** {fecha}\n"
+                        f"👤 **Cliente:** {cliente}\n"
+                        f"📝 **Trámite:** {tramite}\n"
+                        f"📥 **Recaudos:** {recaudos}\n"
+                        f"🛠️ **Acciones:** {acciones}\n"
+                        f"⏳ **Estado:** {estado}\n"
+                        f"👤 **Operador:** {operador}"
+                    )
+                    bot.send_message(chat_id, reporte, parse_mode="Markdown")
+                else:
+                    bot.send_message(chat_id, "⚠️ Los datos del caso no tienen un formato de lista válido.")
             else:
-                # Si el error viene de Google Apps Script (ej. No se encontró el ID)
-                bot.send_message(chat_id, f"❌ {res_json.get('message', 'Error en la petición de búsqueda.')}")
+                bot.send_message(chat_id, f"❌ {res_json.get('message', 'Error desconocido al buscar.')}")
                 
         except Exception as e:
-            bot.send_message(chat_id, f"❌ Error al conectar con la base de datos: {e}")
+            bot.send_message(chat_id, f"❌ Error al conectar con la base de datos o procesar la fila: {e}")
 
-        del user_data[chat_id]
+        if chat_id in user_data:
+            del user_data[chat_id]
         enviar_menu(message)
         return
 
-    # --- 📁 FLUJO DE REGISTRO ORIGINAL ---
+    # --- FLUJO DE REGISTRO ORIGINAL ---
     if paso_actual == 1:
         datos_usuario["cliente"] = message.text
         datos_usuario["paso"] = 2
-        bot.send_message(chat_id, "📝 Ingrese o dicte el **Tipo de Trámite o Causa**:", parse_mode="Markdown")
+        bot.send_message(chat_id, "📝 Ingrese el **Tipo de Trámite o Causa**:", parse_mode="Markdown")
 
     elif paso_actual == 2:
         datos_usuario["tipo_tramite"] = message.text
         datos_usuario["paso"] = 3
-        bot.send_message(chat_id, "📂 Ingrese o dicte los **Recaudos Recibidos** (Ej: Copia de Cédula, Título, Ninguno):", parse_mode="Markdown")
+        bot.send_message(chat_id, "📂 Ingrese los **Recaudos Recibidos** (Ej: Copia de Cédula, Título, Ninguno):", parse_mode="Markdown")
 
     elif paso_actual == 3:
         datos_usuario["recaudos_recibidos"] = message.text
         datos_usuario["paso"] = 4
-        bot.send_message(chat_id, "🛠️ Ingrese o dicte los **Trámites Realizados** hasta ahora:", parse_mode="Markdown")
+        bot.send_message(chat_id, "🛠️ Ingrese los **Trámites Realizados** hasta ahora:", parse_mode="Markdown")
 
     elif paso_actual == 4:
         datos_usuario["tramites_realizados"] = message.text
@@ -247,7 +188,7 @@ def procesar_flujo(message):
             "accion": "guardar",
             "pestana": datos_usuario["pestana"],
             "datos": [
-                "",  # Columna A (Se autogenera el ID incremental secuencial en Google)
+                "",
                 datos_usuario["fecha"],
                 datos_usuario["cliente"],
                 datos_usuario["tipo_tramite"],
@@ -269,11 +210,10 @@ def procesar_flujo(message):
         except Exception as e:
             bot.send_message(chat_id, f"❌ Fallo de conexión: {e}")
 
-        del user_data[chat_id]
+        if chat_id in user_data:
+            del user_data[chat_id]
         enviar_menu(message)
 
 if __name__ == "__main__":
-    print("Limpiando webhooks anteriores...")
-    bot.remove_webhook()
-    print("Bot corriendo con éxito... Escuchando Texto y Notas de voz.")
+    print("Bot corriendo de forma local con éxito...")
     bot.infinity_polling()
