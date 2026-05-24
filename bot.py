@@ -7,7 +7,7 @@ from datetime import datetime
 import zoneinfo
 
 # 🔑 CONFIGURACIÓN PRINCIPAL
-TOKEN_TELEGRAM = "8867621977:AAGVh7ZqNj27QZeIptBGftQv0jnFMJDbt0k"
+TOKEN_TELEGRAM = "8867621977:AAEb3DJj0DjicE1_0WUK3cVFsMe3Ok-_YiA"
 # ⚠️ Pega aquí la nueva URL exacta que generaste en el paso anterior de Google Sheets
 WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwnQZ54IA3Jkivr2bMryDVy9qSFUyjCgvqeXnu2-jmcxZOLn7FRoqfIeRfngFojQ1bo/exec"
 
