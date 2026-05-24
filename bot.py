@@ -85,11 +85,13 @@ def procesar_flujo(message):
     datos_usuario = user_data[chat_id]
     paso_actual = datos_usuario["paso"]
 
-    # --- FLUJO DE BÚSQUEDA CORREGIDO ---
+    # ==========================================
+    # 🔍 # --- FLUJO DE BÚSQUEDA CORREGIDO ---
+    # ==========================================
     if paso_actual == "buscando_id":
         id_buscado = message.text.strip().upper()
-        
-        # Limpieza de seguridad por si escriben el nombre de la pestaña por error
+
+        # Limpieza de seguridad
         id_buscado = id_buscado.replace("TRIBUNALES_CAUSAS", "").replace("ADMINISTRATIVOS", "").strip()
 
         bot.send_message(
@@ -113,6 +115,7 @@ def procesar_flujo(message):
 
             if response.status_code == 200:
                 res_json = response.json()
+
                 if res_json.get("status") == "success":
                     info = res_json.get("data")
                     pestana_encontrada = res_json.get("pestana_encontrada", "No especificada")
@@ -121,6 +124,7 @@ def procesar_flujo(message):
                         while len(info) < 8:
                             info.append("")
 
+                        # DATOS LIMPIOS
                         id_caso  = limpiar_html(info[0] if info[0] else id_buscado)
                         fecha_raw = str(info[1]) if info[1] else ""
 
@@ -151,7 +155,11 @@ def procesar_flujo(message):
                             f"👨‍💼 <b>Operador:</b> {operador}"
                         )
 
-                        bot.send_message(chat_id, reporte, parse_mode="HTML")
+                        bot.send_message(
+                            chat_id,
+                            reporte,
+                            parse_mode="HTML"
+                        )
                     else:
                         bot.send_message(chat_id, "⚠️ Formato inválido recibido desde Google Sheets.")
                 else:
@@ -162,11 +170,15 @@ def procesar_flujo(message):
         except Exception as e:
             bot.send_message(chat_id, f"❌ Error de conexión:\n{e}")
 
-        if chat_id in user_data: del user_data[chat_id]
+        if chat_id in user_data:
+            del user_data[chat_id]
+
         enviar_menu(message)
         return
 
-    # --- FLUJO DE REGISTRO ORIGINAL (CON GENERADOR DE ID CORREGIDO) ---
+    # ==========================================
+    # 📁 --- FLUJO DE REGISTRO ORIGINAL ---
+    # ==========================================
     if paso_actual == 1:
         datos_usuario["cliente"] = message.text
         datos_usuario["paso"] = 2
@@ -192,12 +204,11 @@ def procesar_flujo(message):
     elif paso_actual == 5:
         datos_usuario["estado"] = message.text
         markup_remove = types.ReplyKeyboardRemove()
-        bot.send_message(chat_id, "🚀 Generando identificador único y guardando en Google Sheets...", reply_markup=markup_remove)
+        bot.send_message(chat_id, "🚀 Guardando registro completo en Google Sheets...", reply_markup=markup_remove)
 
-        # ⚡ GENERADOR DE ID PROFESIONAL (Basado en la hora actual de Caracas)
+        # ⚡ # GENERADOR DE ID PROFESIONAL INTEGRADO
         prefijo = "TR" if datos_usuario["pestana"] == "tribunal_causas" else "AD"
-        hora_caracas = datetime.now(zoneinfo.ZoneInfo("America/Caracas")).strftime("%H%M%S")
-        nuevo_id = f"{prefijo}-{hora_caracas}"
+        nuevo_id = f"{prefijo}-{datetime.now(zoneinfo.ZoneInfo('America/Caracas')).strftime('%H%M%S')}"
 
         payload = {
             "accion": "guardar",
@@ -237,7 +248,8 @@ def procesar_flujo(message):
         except Exception as e:
             bot.send_message(chat_id, f"❌ Fallo de conexión: {e}")
 
-        if chat_id in user_data: del user_data[chat_id]
+        if chat_id in user_data: 
+            del user_data[chat_id]
         enviar_menu(message)
 
 if __name__ == "__main__":
