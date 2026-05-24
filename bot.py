@@ -6,11 +6,11 @@ import json
 import requests
 import zoneinfo
 
-# 🔑 CONFIGURACIÓN: Obtiene los valores de las variables que configuraste en Railway
+# Configuración: Asegúrate de que TOKEN_TELEGRAM y WEBAPP_URL 
+# estén configurados como variables de entorno en Railway.
 TOKEN_TELEGRAM = os.environ.get("TOKEN_TELEGRAM")
 WEBAPP_URL = os.environ.get("WEBAPP_URL")
 
-# Inicialización
 bot = telebot.TeleBot(TOKEN_TELEGRAM)
 user_data = {}
 USUARIOS_PERMITIDOS = [8375789261, 5615273235]
@@ -82,11 +82,11 @@ def procesar_flujo(message):
             requests.post(WEBAPP_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
             bot.send_message(chat_id, "✅ ¡Caso guardado con éxito!", reply_markup=types.ReplyKeyboardRemove())
         except Exception as e:
-            bot.send_message(chat_id, f"❌ Error: {e}")
+            bot.send_message(chat_id, f"❌ Error al conectar con Sheets: {e}")
             
         del user_data[chat_id]
         enviar_menu(message)
 
 if __name__ == "__main__":
-    print("Bot activo.")
+    print("Bot activo y escuchando...")
     bot.infinity_polling()
